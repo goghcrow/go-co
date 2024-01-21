@@ -1,0 +1,8 @@
+*.test
+*.out
+.idea/
+
+rewriter/rewrite_dbg.go
+rewriter/legacy
+rewriter/test/out
+rewriter/test/out_tmp
