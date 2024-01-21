@@ -2,7 +2,7 @@
 *.out
 .idea/
 
-rewriter/rewrite_dbg.go
+rewriter/rewrite_dbg_test.go
 rewriter/legacy
 rewriter/test/out
 rewriter/test/out_tmp

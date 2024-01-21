@@ -148,7 +148,7 @@ func (b *block) mustNoYield() bool {
 	return !b.mayContainsYield()
 }
 
-func (b *block) requireReturnNormal() bool {
+func (b *block) requireReturnNormal(r *rewriter) bool {
 	assert(b.kind == kindDelay ||
 		b.kind == kindFor || b.kind == kindIf)
 
@@ -160,8 +160,10 @@ func (b *block) requireReturnNormal() bool {
 
 	// notice:
 	// even though for-block is empty, `return Normal()` MUSTN'T be appended
-	// e.g., for { } => for { return Normal() }
-	// if return appended, control flow will be broken
+	// e.g., for { } => for { return Normal() }, control flow will be broken
+	// actually, `for { }` is trival, not kindFor
+
+	// return !r.isTerminating(b.block)
 
 	last, kind := b.last()
 	switch kind {
@@ -174,10 +176,7 @@ func (b *block) requireReturnNormal() bool {
 		// 	kindCombine: children.pushReturn(callCombine, kindCombine)
 		// 	kindFor: children.pushReturn(callFor, kindFor)
 		// 	kindIf, kindSwitch, kindTrival: ↓↓↓
-	case kindIf, kindSwitch:
-		return !allBranchesEndWithReturn(last)
-	case kindTrival:
-		// return-nil has rewritten to kindTrival return-stmt in pass0
-		return !instanceof[*ast.ReturnStmt](last)
+	case kindIf, kindSwitch, kindTrival:
+		return !r.isTerminating(last)
 	}
 }

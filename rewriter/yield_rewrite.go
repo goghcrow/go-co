@@ -235,6 +235,10 @@ func (r *yieldRewriter) rewriteStmt(
 			return children
 		}
 
+	case *ast.SwitchStmt:
+		// ↓↓ non-trival branch ↓↓
+		return r.rewriteSwitchStmt(stmt, children)
+
 	case *ast.ForStmt:
 		// ↓↓ non-trival branch ↓↓
 		return r.rewriteForStmt(stmt, children)
@@ -245,7 +249,7 @@ func (r *yieldRewriter) rewriteStmt(
 
 	case *ast.SelectStmt, *ast.CommClause,
 		*ast.LabeledStmt, *ast.CaseClause,
-		*ast.SwitchStmt, *ast.TypeSwitchStmt,
+		*ast.TypeSwitchStmt,
 		*ast.DeferStmt:
 		r.assert(false, stmt, "%T implement me", stmt)
 		panic("make compiler happy")
@@ -278,7 +282,7 @@ func (r *yieldRewriter) rewriteBlockStmt(
 // additional return-normal() required
 // when last stmt is kindIf / kindSwitch / kindTrival
 func (r *yieldRewriter) generateLastNormalIfNecessary(children *block) {
-	if children.requireReturnNormal() {
+	if children.requireReturnNormal(r.rewriter) {
 		// markCombined manually, cause of no need to check
 		// when normal return required
 		children.markCombined()
@@ -302,7 +306,7 @@ func (r *yieldRewriter) rewriteYieldCall(
 }
 
 func (r *yieldRewriter) rewriteIfStmt(
-	ifStmt *ast.IfStmt,
+	stmt *ast.IfStmt,
 	children *block,
 ) {
 	// merge elif stmt
@@ -320,45 +324,45 @@ func (r *yieldRewriter) rewriteIfStmt(
 		return block
 	}
 
-	switch alt := ifStmt.Else.(type) {
+	switch alt := stmt.Else.(type) {
 	case nil:
-		body := r.rewriteBlockStmt(ifStmt.Body, kindIf)
+		body := r.rewriteBlockStmt(stmt.Body, kindIf)
 		if body.mustNoYield() {
-			children.push(ifStmt, kindTrival)
+			children.push(stmt, kindTrival)
 			return
 		}
 
 		elsStmt := unwrapIf(nil)
-		iff := X.IfStmt(ifStmt.Init, ifStmt.Cond, body.block, elsStmt)
+		iff := X.IfStmt(stmt.Init, stmt.Cond, body.block, elsStmt)
 		children.push(iff, kindIf)
 		return
 
 	case *ast.BlockStmt:
-		body := r.rewriteBlockStmt(ifStmt.Body, kindIf)
+		body := r.rewriteBlockStmt(stmt.Body, kindIf)
 		els := r.rewriteBlockStmt(alt, kindIf)
 		isTrival := body.mustNoYield() && els.mustNoYield()
 		if isTrival {
-			children.push(ifStmt, kindTrival)
+			children.push(stmt, kindTrival)
 			return
 		}
 
 		elsStmt := unwrapIf(els.block)
-		iff := X.IfStmt(ifStmt.Init, ifStmt.Cond, body.block, elsStmt)
+		iff := X.IfStmt(stmt.Init, stmt.Cond, body.block, elsStmt)
 		children.push(iff, kindIf)
 		return
 
 	case *ast.IfStmt:
-		body := r.rewriteBlockStmt(ifStmt.Body, kindIf)
+		body := r.rewriteBlockStmt(stmt.Body, kindIf)
 		els := mkBlock(kindIf)
 		r.rewriteIfStmt(alt, els)
 		isTrival := body.mustNoYield() && els.mustNoYield()
 		if isTrival {
-			children.push(ifStmt, kindTrival)
+			children.push(stmt, kindTrival)
 			return
 		}
 
 		elsStmt := unwrapIf(els.block)
-		iff := X.IfStmt(ifStmt.Init, ifStmt.Cond, body.block, elsStmt)
+		iff := X.IfStmt(stmt.Init, stmt.Cond, body.block, elsStmt)
 		children.push(iff, kindIf)
 		return
 	default:
@@ -366,56 +370,98 @@ func (r *yieldRewriter) rewriteIfStmt(
 	}
 }
 
-func (r *yieldRewriter) rewriteForStmt(
-	forStmt *ast.ForStmt,
+func (r *yieldRewriter) rewriteSwitchStmt(
+	stmt *ast.SwitchStmt,
 	children *block,
 ) *block {
-	// try to rewrite and test whether containing yield
-	mustNoYield := func(stmt ast.Stmt) bool {
-		if isNilNode(stmt) {
-			return true
-		}
-		// isLast=false and kind=kindYield
-		// don't affect the result
-		b := mkBlock(kindYield)
-		r.rewriteStmt(stmt, false, b)
-		return b.mustNoYield()
+	trivalInit := r.mustNoYield(stmt.Init)
+	allCaseTrival := true
+	var cases []ast.Stmt
+	for _, it := range stmt.Body.List {
+		// yield is not supported in case expr, but
+		// yield has no return, no need to assert
+		clause := it.(*ast.CaseClause)
+		caseBody := r.rewriteBlockStmt(X.Block(clause.Body...), kindSwitch)
+		cases = append(cases, X.Case(clause.List, caseBody.block.List))
+		allCaseTrival = allCaseTrival && caseBody.mustNoYield()
 	}
 
-	body := r.rewriteBlockStmt(forStmt.Body, kindFor)
+	// trival routine
+	if trivalInit && allCaseTrival {
+		children.push(stmt, kindTrival)
+		return children
+	}
 
-	trivalInit := mustNoYield(forStmt.Init)
-	trivalPost := mustNoYield(forStmt.Post)
+	// extract out init stmt if present
+	if stmt.Init != nil {
+		// details referring to comment in rewriteInitStmt
+		assert(!isDefineStmt(stmt.Init))
+		children = r.rewriteStmt(stmt.Init, false, children)
+		r.assert(children != nil, stmt, "illegal state")
+		stmt.Init = nil
+		stmt.Switch = token.NoPos
+	}
+
+	// stmt.Init non trival
+	if allCaseTrival {
+		switchStmt := X.SwitchStmt(
+			nil, // extracted out
+			stmt.Tag,
+			stmt.Body,
+		)
+		children.push(switchStmt, kindTrival)
+		return children
+	}
+
+	// not all case trival
+	switchStmt := X.SwitchStmt(
+		nil,
+		stmt.Tag,
+		X.Block(cases...),
+	)
+	children = r.combineIfNecessary(children)
+	children.push(switchStmt, kindSwitch)
+	return children
+}
+
+func (r *yieldRewriter) rewriteForStmt(
+	stmt *ast.ForStmt,
+	children *block,
+) *block {
+	body := r.rewriteBlockStmt(stmt.Body, kindFor)
+
+	trivalInit := r.mustNoYield(stmt.Init)
+	trivalPost := r.mustNoYield(stmt.Post)
 	trivalBody := body.mustNoYield()
 
 	// trival routine
 	allTrival := trivalBody && trivalInit && trivalPost
 	if allTrival {
-		children.push(forStmt, kindTrival)
+		children.push(stmt, kindTrival)
 		return children
 	}
 
 	// extract out init stmt if present
-	if forStmt.Init != nil {
-		// details referring to comment in rewriteForStmtInit
-		assert(!isDefineStmt(forStmt.Init))
-		children = r.rewriteStmt(forStmt.Init, false, children)
-		r.assert(children != nil, forStmt, "illegal state")
-		forStmt.Init = nil
-		forStmt.For = token.NoPos
+	if stmt.Init != nil {
+		// details referring to comment in rewriteInitStmt
+		assert(!isDefineStmt(stmt.Init))
+		children = r.rewriteStmt(stmt.Init, false, children)
+		r.assert(children != nil, stmt, "illegal state")
+		stmt.Init = nil
+		stmt.For = token.NoPos
 	}
 
 	// trival routine
 	if trivalBody && trivalPost {
 		children = r.combineIfNecessary(children) // for init containing yield
-		children.push(forStmt, kindTrival)
+		children.push(stmt, kindTrival)
 		return children
 	}
 
 	if trivalPost {
 		callFor := r.CallFor(
-			r.ForCondFun(forStmt.Cond),
-			r.ForPostFun(forStmt.Post),
+			r.ForCondFun(stmt.Cond),
+			r.ForPostFun(stmt.Post),
 			r.CallDelay(body.block),
 		)
 		children = r.combineIfNecessary(children)
@@ -437,7 +483,7 @@ func (r *yieldRewriter) rewriteForStmt(
 		// yield-call allowed, return not allowed,
 		// so, no need to add return-normal
 		postBlock := mkBlock(kindDelay)
-		r.rewriteStmt(forStmt.Post, true, postBlock)
+		r.rewriteStmt(stmt.Post, true, postBlock)
 		assert(instanceof[*ast.ReturnStmt](postBlock.lastStmt()))
 
 		r.generateLastNormalIfNecessary(body)
@@ -448,13 +494,13 @@ func (r *yieldRewriter) rewriteForStmt(
 		body = newBody
 	} else {
 		// can't declare variable in for-post, name conflict free
-		assert(!isDefineStmt(forStmt.Post))
+		assert(!isDefineStmt(stmt.Post))
 		body.markCombined()
-		r.rewriteStmt(forStmt.Post, true, body)
+		r.rewriteStmt(stmt.Post, true, body)
 	}
 
 	callFor := r.CallFor(
-		r.ForCondFun(forStmt.Cond),
+		r.ForCondFun(stmt.Cond),
 		nil,
 		r.CallDelay(body.block),
 	)
@@ -617,6 +663,24 @@ func (r *yieldRewriter) rewriteBreakContinue(body *ast.BlockStmt) {
 		}
 		return true
 	})
+}
+
+// try to rewrite and test whether containing yield
+func (r *yieldRewriter) mustNoYield(stmt ast.Stmt) bool {
+	if isNilNode(stmt) {
+		return true
+	}
+	// isLast=false and kind=kindYield
+	// don't affect the result
+	b := mkBlock(kindYield)
+	r.rewriteStmt(stmt, false, b)
+	return b.mustNoYield()
+}
+
+func (r *rewriter) isTerminating(s ast.Stmt) bool {
+	checker := mkTerminationChecker(r)
+	checker.collectPanic(s)
+	return checker.isTerminating(s)
 }
 
 func (r *yieldRewriter) assert(

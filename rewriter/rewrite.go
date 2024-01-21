@@ -3,6 +3,7 @@ package rewriter
 import (
 	"fmt"
 	"go/ast"
+	"go/token"
 	"go/types"
 	"log"
 	"os"
@@ -109,7 +110,7 @@ func rewrite(
 		// notice: order matters
 		do(rewriteYieldFrom.rewrite) // rewrite yieldFrom() to range yield() (range co.Iter)
 		do(r.rewriteForRanges)       // rewrite range co.Iter to for loop co.Iter
-		do(r.rewriteForStmtInit)     // extract out define in for-init (including rewriteForRanges output)
+		do(r.rewriteInitStmt)        // extract out define in for-init/switch-init
 		do(rewriteYield.rewrite)     // rewrite yield func
 		do(r.rewriteIter)            // rewrite all co.Iter to seq.Iterator
 
@@ -214,12 +215,20 @@ func (r *rewriter) assert(ok bool, pos ast.Node, format string, a ...any) {
 //		$init
 //		for ; ; { ... }
 //	}
-func (r *rewriter) rewriteForStmtInit(c *astutil.Cursor) bool {
+func (r *rewriter) rewriteInitStmt(c *astutil.Cursor) bool {
 	switch n := c.Node().(type) {
 	case *ast.ForStmt:
 		if isDefineStmt(n.Init) {
 			init := n.Init
 			n.Init = nil
+			n.For = token.NoPos
+			c.Replace(X.Block(init, n))
+		}
+	case *ast.SwitchStmt:
+		if isDefineStmt(n.Init) {
+			init := n.Init
+			n.Init = nil
+			n.Switch = token.NoPos
 			c.Replace(X.Block(init, n))
 		}
 	}

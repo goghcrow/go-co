@@ -20,9 +20,7 @@ func ignoreReturn() (_ ʂɘʠ.Iterator[int]) {
 			return ʂɘʠ.Return[int]()
 
 		}
-		return ʂɘʠ.Normal[int]()
 	}))
-
 }
 
 func returnNil() ʂɘʠ.Iterator[int] {
@@ -49,9 +47,7 @@ func endlessLoop() ʂɘʠ.Iterator[int] {
 	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 		for {
 		}
-		return ʂɘʠ.Normal[int]()
 	}))
-
 }
 
 func endlessLoopWithReturn() ʂɘʠ.Iterator[int] {
@@ -132,9 +128,7 @@ func endlessForWithReturn() ʂɘʠ.Iterator[int] {
 			return ʂɘʠ.Return[int]()
 
 		}
-		return ʂɘʠ.Normal[int]()
 	}))
-
 }
 
 func endlessForWithBreak() ʂɘʠ.Iterator[int] {
@@ -211,330 +205,6 @@ func endlessForWithYieldThenReturn() ʂɘʠ.Iterator[int] {
 			return ʂɘʠ.Bind[int](0, func() ʂɘʠ.Seq[int] {
 				return ʂɘʠ.Return[int]()
 			})
-		}))
-	}))
-
-}
-
-func ifIsNotTheLastInBlock_EmptyBranch() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			if true {
-			} else {
-				return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			}
-			return ʂɘʠ.Normal[int]()
-		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Return[int]()
-		}))
-	}))
-
-}
-
-func ifIsNotTheLastInBlock_TwoBranchesReturn() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			if true {
-				return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			} else {
-				return ʂɘʠ.Bind[int](2, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			}
-		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Return[int]()
-		}))
-	}))
-
-}
-
-func ifIsNotTheLastInBlock_MissingBranch1() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			if true {
-				return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			}
-			return ʂɘʠ.Normal[int]()
-		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Return[int]()
-		}))
-	}))
-
-}
-
-func ifIsNotTheLastInBlock_MissingBranch2() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			if true {
-				return ʂɘʠ.Bind[int](0, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Return[int]()
-				})
-			}
-			return ʂɘʠ.Normal[int]()
-		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Return[int]()
-		}))
-	}))
-
-}
-
-func ifIsNotTheLastInBlock_MissingBranch3() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			if true {
-				return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			} else if true {
-				return ʂɘʠ.Bind[int](2, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			}
-			return ʂɘʠ.Normal[int]()
-		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Return[int]()
-		}))
-	}))
-
-}
-
-func ifIsNotTheLastInBlock_AllBranchesReturn() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			if true {
-				return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			} else if true {
-				return ʂɘʠ.Bind[int](2, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			} else {
-				return ʂɘʠ.Bind[int](3, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			}
-		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Return[int]()
-		}))
-	}))
-
-}
-
-func ifIsNotTheLastInBlock_AllBranchesReturn1() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			if true {
-				return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			} else if true {
-				return ʂɘʠ.Bind[int](2, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			} else {
-				return ʂɘʠ.Bind[int](3, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			}
-		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Return[int]()
-		}))
-	}))
-
-}
-
-func ifIsTheLastInBlock_EmptyBranch1() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-				if true {
-				} else {
-					return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-						return ʂɘʠ.Normal[int]()
-					})
-				}
-				return ʂɘʠ.Normal[int]()
-			}))
-		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Return[int]()
-		}))
-	}))
-
-}
-
-func ifIsTheLastInBlock_EmptyBranch2() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			if true {
-			} else {
-				return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			}
-			return ʂɘʠ.Normal[int]()
-		}))
-	}))
-
-}
-
-func ifIsTheLastInBlock_TwoBranchesReturn1() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-				if true {
-					return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-						return ʂɘʠ.Normal[int]()
-					})
-				} else {
-					return ʂɘʠ.Bind[int](2, func() ʂɘʠ.Seq[int] {
-						return ʂɘʠ.Normal[int]()
-					})
-				}
-			}))
-		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Return[int]()
-		}))
-	}))
-
-}
-
-func ifIsTheLastInBlock_TwoBranchesReturn2() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			if true {
-				return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			} else {
-				return ʂɘʠ.Bind[int](2, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			}
-		}))
-	}))
-
-}
-
-func ifIsTheLastInBlock_MissingBranch11() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-				if true {
-					return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-						return ʂɘʠ.Normal[int]()
-					})
-				}
-				return ʂɘʠ.Normal[int]()
-			}))
-		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Return[int]()
-		}))
-	}))
-
-}
-
-func ifIsTheLastInBlock_MissingBranch12() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			if true {
-				return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			}
-			return ʂɘʠ.Normal[int]()
-		}))
-	}))
-
-}
-
-func ifIsTheLastInBlock_MissingBranch21() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-				if true {
-					return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-						return ʂɘʠ.Normal[int]()
-					})
-				} else if true {
-					return ʂɘʠ.Bind[int](2, func() ʂɘʠ.Seq[int] {
-						return ʂɘʠ.Normal[int]()
-					})
-				}
-				return ʂɘʠ.Normal[int]()
-			}))
-		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Return[int]()
-		}))
-	}))
-
-}
-
-func ifIsTheLastInBlock_MissingBranch22() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			if true {
-				return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			} else if true {
-				return ʂɘʠ.Bind[int](2, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			}
-			return ʂɘʠ.Normal[int]()
-		}))
-	}))
-
-}
-
-func ifIsTheLastInBlock_AllBranchesReturn1() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-				if true {
-					return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-						return ʂɘʠ.Normal[int]()
-					})
-				} else if true {
-					return ʂɘʠ.Bind[int](2, func() ʂɘʠ.Seq[int] {
-						return ʂɘʠ.Normal[int]()
-					})
-				} else {
-					return ʂɘʠ.Bind[int](3, func() ʂɘʠ.Seq[int] {
-						return ʂɘʠ.Normal[int]()
-					})
-				}
-			}))
-		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Return[int]()
-		}))
-	}))
-
-}
-
-func ifIsTheLastInBlock_AllBranchesReturn2() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			if true {
-				return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			} else if true {
-				return ʂɘʠ.Bind[int](2, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			} else {
-				return ʂɘʠ.Bind[int](3, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Normal[int]()
-				})
-			}
 		}))
 	}))
 
@@ -666,22 +336,6 @@ func block0() ʂɘʠ.Iterator[int] {
 
 }
 
-// ↑ is equivalent to ↓
-func block1() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-				return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Break[int]()
-				})
-			}))
-		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Return[int]()
-		}))
-	}))
-
-}
-
 func block00() ʂɘʠ.Iterator[int] {
 	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
@@ -692,28 +346,6 @@ func block00() ʂɘʠ.Iterator[int] {
 					})
 				})
 			})
-		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Return[int]()
-		}))
-	}))
-
-}
-
-// ↑ is equivalent to ↓
-func block11() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-				return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-						return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-							return ʂɘʠ.Break[int]()
-						})
-					}))
-				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Break[int]()
-				}))
-			}))
 		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 			return ʂɘʠ.Return[int]()
 		}))
@@ -744,91 +376,6 @@ func block011() ʂɘʠ.Iterator[int] {
 				}))
 			}))
 		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Return[int]()
-		}))
-	}))
-
-}
-
-// ↑ is equivalent to ↓
-func block111() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-
-				i := 1
-				return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-
-						i := 2
-						return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-
-							println(i)
-							return ʂɘʠ.Break[int]()
-						})
-					}))
-				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-
-					println(i)
-					return ʂɘʠ.Normal[int]()
-				}))
-			}))
-		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Return[int]()
-		}))
-	}))
-
-}
-
-func shadow0() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		i := 0
-		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-
-				i := 0
-				return ʂɘʠ.For[int](func() bool {
-					return i < 2
-				}, func() {
-					i++
-				}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Bind[int](i, func() ʂɘʠ.Seq[int] {
-						return ʂɘʠ.Normal[int]()
-					})
-				}))
-			})
-		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-
-			i++
-			println(i)
-			return ʂɘʠ.Return[int]()
-		}))
-	}))
-
-}
-
-// ↑ is equivalent to ↓
-func shadow1() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		i := 0
-		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-
-				i := 0
-				return ʂɘʠ.For[int](func() bool {
-					return i < 2
-				}, func() {
-					i++
-				}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Bind[int](i, func() ʂɘʠ.Seq[int] {
-						return ʂɘʠ.Normal[int]()
-					})
-				}))
-			})
-		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-
-			i++
-			println(i)
 			return ʂɘʠ.Return[int]()
 		}))
 	}))

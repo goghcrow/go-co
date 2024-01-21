@@ -97,6 +97,25 @@ func (factor) IfStmt(
 	}
 }
 
+func (factor) Case(list []ast.Expr, body []ast.Stmt) *ast.CaseClause {
+	return &ast.CaseClause{
+		List: list,
+		Body: body,
+	}
+}
+
+func (factor) SwitchStmt(
+	init ast.Stmt,
+	tag ast.Expr,
+	body *ast.BlockStmt,
+) *ast.SwitchStmt {
+	return &ast.SwitchStmt{
+		Init: init,
+		Tag:  tag,
+		Body: body,
+	}
+}
+
 func (factor) ForStmt(
 	init ast.Stmt,
 	cond ast.Expr,
@@ -164,52 +183,6 @@ func identicalWithoutTypeParam(x, y types.Type) bool {
 		unwrapTyParam(x),
 		unwrapTyParam(y),
 	)
-}
-
-func allBranchesEndWithReturn(stmt ast.Stmt) bool {
-	blockEndWithReturnStmt := func(xs []ast.Stmt) bool {
-		if len(xs) == 0 {
-			return false
-		}
-		switch stmt := xs[len(xs)-1].(type) {
-		case *ast.ReturnStmt:
-			return true
-		// case *ast.BranchStmt WHEN in yield func:
-		// but break/continue may be rewritten
-		// until pass2, so we can't judge here
-		default:
-			return allBranchesEndWithReturn(stmt)
-		}
-	}
-
-	switch stmt := stmt.(type) {
-	default:
-		return false
-	case *ast.BlockStmt:
-		return blockEndWithReturnStmt(stmt.List)
-
-	case *ast.IfStmt:
-		if !blockEndWithReturnStmt(stmt.Body.List) {
-			return false
-		}
-		return allBranchesEndWithReturn(stmt.Else)
-	case *ast.SwitchStmt:
-		for _, it := range stmt.Body.List {
-			cc := it.(*ast.CaseClause)
-			if !blockEndWithReturnStmt(cc.Body) {
-				return false
-			}
-		}
-		return true
-	case *ast.TypeSwitchStmt:
-		for _, it := range stmt.Body.List {
-			cc := it.(*ast.CaseClause)
-			if !blockEndWithReturnStmt(cc.Body) {
-				return false
-			}
-		}
-		return true
-	}
 }
 
 // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓ stack for astutil.Apply ↓↓↓↓↓↓↓↓↓↓↓↓↓↓
