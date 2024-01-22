@@ -30,6 +30,28 @@ Rewrite control flow to monadic func invoking.
 - [ ] DeferStmt
 
 
+## Quick Start
+
+`go get github.com/goghcrow/go-co@latest`
+
+```golang
+package main
+
+import (
+    "github.com/goghcrow/go-co/rewriter"
+    "github.com/goghcrow/go-ast-matcher"
+)
+
+func main() {
+    rewriter.Compile(
+        "./src",
+        "./out",
+        matcher.PatternAll,
+        matcher.WithLoadTest(),
+    )
+}
+```
+
 ## Example
 
 ````golang
