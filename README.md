@@ -1,6 +1,6 @@
 ## What is go-co
 
-go-co(routine) is a **Source to Source Compiler** which rewrites trival yield expression to monadic sequence implementation.
+go-co(routine) is a **Source to Source Compiler** which rewrites trival yield expression to monadic style code.
 
 Inspired by [wind-js](https://github.com/JeffreyZhao/wind).
 
