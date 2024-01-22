@@ -7,7 +7,14 @@ const (
 
 	cstYieldFromRangeVar = "ʌ" // v۰
 
-	cstIterator = "Iterator"
+	cstPairKey = "Key"
+	cstPairVal = "Val"
+
+	cstIterator      = "Iterator"
+	cstNewStringIter = "NewStringIter"
+	cstNewSliceIter  = "NewSliceIter"
+	cstNewArrayIter  = "NewArrayIter"
+	cstNewMapIter    = "NewMapIter"
 
 	cstSeq      = "Seq"
 	cstStart    = "Start"

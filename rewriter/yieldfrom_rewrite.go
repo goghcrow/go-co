@@ -3,6 +3,7 @@ package rewriter
 import (
 	"go/ast"
 	"go/token"
+	"go/types"
 
 	"golang.org/x/tools/go/ast/astutil"
 )
@@ -38,31 +39,52 @@ func (r *yieldFromRewriter) rewriteYieldFrom(call *ast.CallExpr) *ast.RangeStmt 
 	// so we need to update info.Uses[GeneratedYield] to `yieldFunc`
 	// `typeutil.Callee` calling in isYieldCall use info.Uses only, not info.Selections
 	// so we only update info.Uses here
-	r.rewriter.updateUses(yield, r.rewriter.yieldFunc)
+	r.rewriter.UpdateUses(yield, r.rewriter.yieldFunc)
 
 	// wrap the Yield type parameter the same as YieldFrom
 	if idx, ok := call.Fun.(*ast.IndexExpr); ok {
 		yield = X.Index(yield, idx.Index)
 	}
 
+	iter := call.Args[0]
+	iterTyArg := r.checkYieldCall(call)
+	return r.rangeIter(call, yield, iter, iterTyArg)
+}
+
+func (r *yieldFromRewriter) checkYieldCall(call *ast.CallExpr) types.Type {
 	r.assert(len(call.Args) == 1, call, "invalid args num")
 	iter := call.Args[0]
-	rgIt := r.rangeIter(yield, iter)
+	tyOfIt := r.rewriter.TypeOf(iter) // co.Iter[V]
 
-	_, isYieldCall := r.rewriter.isYieldCall(rgIt.Body.List[0])
-	r.assert(isYieldCall, iter, "illegal state")
+	msg := "invalid YieldFrom arg type"
+	r.assert(instanceof[*types.Named](tyOfIt), call, msg)
 
-	return rgIt
+	iterNamed := tyOfIt.(*types.Named)
+	r.assert(iterNamed.Obj() == r.rewriter.iterType, call, msg)
+
+	assert(iterNamed.TypeArgs().Len() == 1)
+	return iterNamed.TypeArgs().At(0)
 }
 
 func (r *yieldFromRewriter) rangeIter(
+	pos *ast.CallExpr,
 	yieldFun ast.Expr,
 	iter ast.Expr,
+	iterT types.Type,
 ) *ast.RangeStmt {
-	key := X.Ident(cstYieldFromRangeVar)
-	callYield := X.Stmt(
-		X.Call(yieldFun, key),
-	)
+	// key := X.Ident(cstYieldFromRangeVar)
+	// make ident with a type for checkYieldCall
+	key := r.rewriter.NewIdent(cstYieldFromRangeVar, iterT)
+
+	call := X.Call(yieldFun, key)
+	call.Lparen = pos.Lparen
+	call.Rparen = pos.Rparen
+
+	callYield := X.Stmt(call)
+
+	_, isYieldCall := r.rewriter.isYieldCall(callYield)
+	assert(isYieldCall)
+
 	return &ast.RangeStmt{
 		Key:  key,
 		Tok:  token.DEFINE,

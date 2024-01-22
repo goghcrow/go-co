@@ -18,6 +18,8 @@ type yieldRewriter struct {
 
 	// file scope cache
 	rewriteRetCache map[ast.Node]bool
+
+	symCnt int
 }
 
 func mkYieldRewriter(r *rewriter) *yieldRewriter {
@@ -81,17 +83,13 @@ func (r *yieldRewriter) rewriteYieldFuncResult() {
 
 // >>> return Start(Delay[T](func() Seq[T] { ... }))
 func (r *yieldRewriter) rewriteYieldFuncBody() {
-	// bootstrap
-	// start(delay(func() { kindDelay }))
-	following := mkBlock(kindDelay /*callback func lit body*/)
-
 	// pass0
 	// rewrite `return` or `return nil` to return seq.Return() in yield func
 	// in the old implementation, we replace the trival block body of
 	// "ifStmt / forStmt / blockStmt..." to the rewriting result
 	// for keeping the rewiring result of returnStmt
 	// (return => return seq.Return[T]()) in rewriteStmt.
-	// now, we rewrite returnStmt in yieldFunc (pass0) instead of in rewriteStmt (pass1),
+	// now, we rewrite returnStmt in yieldFunc (pass0) instead of in rewriteStmt (pass2),
 	// so, the original node can be returned directly in trival branch of "if/for/block...".
 	// the code is more intuitive.
 	// in the old requireReturnNormal func, "return Normal()" is added in all kindTrival blocks,
@@ -101,14 +99,21 @@ func (r *yieldRewriter) rewriteYieldFuncBody() {
 	r.rewriteReturn(r.funcBody)
 
 	// pass1
+	r.rewriteRanges(r.funcBody)
+
+	// bootstrap
+	// start(delay(func() { kindDelay }))
+	following := mkBlock(kindDelay /*callback func lit body*/)
+
+	// pass2
 	// skipping ReturnStmt, which rewritten in pass0
 	r.rewriteStmts(r.funcBody.List, 0, following)
 
-	// pass2
+	// pass3
 	// we will rewrite break/continue in the second pass
 	// because we don't know whether to keep break/continue in trival context,
 	// or to replace with co.Break() co.Continue() in monadic context
-	r.rewriteBreakContinue(following.block)
+	r.rewriteBreakContinues(following.block)
 
 	returnCallStart := X.Return(r.CallStart(following.block))
 	r.funcBody.List = []ast.Stmt{returnCallStart}
@@ -182,6 +187,8 @@ func (r *yieldRewriter) rewriteStmt(
 	case *ast.ExprStmt:
 		// rewrite yield call
 		if call, ok := r.rewriter.isYieldCall(stmt); ok {
+			r.checkYieldCall(call) // typeCheck
+
 			// ↓↓ non-trival branch ↓↓
 			following := r.rewriteYieldCall(call, children)
 			if isLast {
@@ -207,7 +214,7 @@ func (r *yieldRewriter) rewriteStmt(
 
 	case *ast.BranchStmt:
 		// ↓↓ trival branch ↓↓
-		// rewrite branch in pass2
+		// rewrite branch in pass3
 		switch stmt.Tok {
 		case token.BREAK, token.CONTINUE, token.FALLTHROUGH:
 			// fallthrough supported only in trival switch node
@@ -243,9 +250,8 @@ func (r *yieldRewriter) rewriteStmt(
 		// ↓↓ non-trival branch ↓↓
 		return r.rewriteForStmt(stmt, children)
 
-	case *ast.RangeStmt:
-		r.assert(false, stmt, "implement me")
-		panic("make compiler happy")
+	// rewritten in pass1
+	// case *ast.RangeStmt:
 
 	case *ast.SelectStmt, *ast.CommClause,
 		*ast.LabeledStmt, *ast.CaseClause,
@@ -290,6 +296,20 @@ func (r *yieldRewriter) generateLastNormalIfNecessary(children *block) {
 		callNormal := r.CallNormal()
 		children.pushReturn(callNormal, kindNormal)
 	}
+}
+func (r *yieldRewriter) checkYieldCall(call *ast.CallExpr) {
+	v := r.rewriter.TypeOf(call.Args[0])
+	t := r.rewriter.TypeOf(r.yieldAst.funRetParamTy)
+	// generated codes have attached the type
+	assert(v != nil && t != nil)
+
+	arg := r.rewriter.ShowNode(call.Args[0])
+	r.assert(types.AssignableTo(v, t), call.Lparen,
+		"yield(%s):"+
+			" type mismatch, typeof(%s) is %s, "+
+			"not assignable to return type %s",
+		arg, arg,
+		v.String(), t.String())
 }
 
 // return Bind($v, func() Seq[T] { $following })
@@ -593,7 +613,7 @@ func (r *yieldRewriter) rewriteReturn(body *ast.BlockStmt) {
 	})
 }
 
-func (r *yieldRewriter) rewriteBreakContinue(body *ast.BlockStmt) {
+func (r *yieldRewriter) rewriteBreakContinues(body *ast.BlockStmt) {
 	var (
 		loopStack = mkStack[bool](false) // default in trival for
 		enterLoop = loopStack.push
@@ -667,7 +687,7 @@ func (r *yieldRewriter) rewriteBreakContinue(body *ast.BlockStmt) {
 
 // try to rewrite and test whether containing yield
 func (r *yieldRewriter) mustNoYield(stmt ast.Stmt) bool {
-	if isNilNode(stmt) {
+	if isNil(stmt) {
 		return true
 	}
 	// isLast=false and kind=kindYield
@@ -685,7 +705,7 @@ func (r *rewriter) isTerminating(s ast.Stmt) bool {
 
 func (r *yieldRewriter) assert(
 	ok bool,
-	pos ast.Node,
+	pos any,
 	format string,
 	a ...any,
 ) {

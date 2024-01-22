@@ -69,12 +69,12 @@ func (a *ArrayIter[V]) Current() Pair[int, V] {
 }
 
 type StringIter struct {
-	str string
+	str []rune
 	idx int
 }
 
-func NewStringIter(str string) Iterator[Pair[int, byte]] {
-	return &StringIter{str: str, idx: -1}
+func NewStringIter(str string) Iterator[Pair[int, rune]] {
+	return &StringIter{str: []rune(str), idx: -1}
 }
 
 func (s *StringIter) MoveNext() bool {
@@ -82,8 +82,26 @@ func (s *StringIter) MoveNext() bool {
 	return s.idx < len(s.str)
 }
 
-func (s *StringIter) Current() Pair[int, byte] {
-	return Pair[int, byte]{Key: s.idx, Val: s.str[s.idx]}
+func (s *StringIter) Current() Pair[int, rune] {
+	return Pair[int, rune]{Key: s.idx, Val: s.str[s.idx]}
+}
+
+type IntegerIter struct {
+	n int
+	i int
+}
+
+func NewIntegerIter(n int) Iterator[int] {
+	return &IntegerIter{n: n}
+}
+
+func (i *IntegerIter) MoveNext() bool {
+	i.i++
+	return i.i <= i.n
+}
+
+func (i *IntegerIter) Current() int {
+	return i.i
 }
 
 type ChanIter[V any] struct {

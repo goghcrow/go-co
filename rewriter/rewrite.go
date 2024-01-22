@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 
 	"github.com/goghcrow/go-ast-matcher"
@@ -176,22 +175,18 @@ func (r *rewriter) isIterator(ty types.Type) bool {
 	return identicalWithoutTypeParam(r.iterType.Type(), ty)
 }
 
-func (r *rewriter) updateUses(idOrSel ast.Expr, obj types.Object) {
-	switch x := idOrSel.(type) {
-	case *ast.Ident:
-		r.Uses[x] = obj
-	case *ast.SelectorExpr:
-		r.Uses[x.Sel] = obj
-	default:
-		panic("unreached")
-	}
-}
-
-func (r *rewriter) assert(ok bool, pos ast.Node, format string, a ...any) {
+func (r *rewriter) assert(ok bool, pos any, format string, a ...any) {
 	if !ok {
 		loc := "unknown"
-		if pos != nil && reflect.ValueOf(pos).IsNil() {
-			loc = r.ShowPos(pos)
+		if !isNil(pos) {
+			switch pos := pos.(type) {
+			case ast.Node:
+				loc = r.ShowPos(pos)
+			case token.Pos:
+				loc = r.FSet.Position(pos).String()
+			case string:
+				loc = pos
+			}
 		}
 		panic(fmt.Sprintf(format, a...) + " in: " + loc)
 	}
@@ -279,7 +274,8 @@ func (r *rewriter) rewriteForRange(fr *ast.RangeStmt) *ast.ForStmt {
 	isValid := fr.Key != nil && fr.Value == nil
 	r.assert(isValid, fr, "invalid for range")
 
-	iter := X.Ident(cstIterVar)
+	// iter := X.Ident(cstIterVar)
+	iter := r.NewIdent(cstIterVar, r.TypeOf(fr.X))
 	current := X.Select(iter, cstCurrent)
 	next := X.Select(iter, cstMoveNext)
 

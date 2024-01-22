@@ -98,17 +98,17 @@ func (y *yieldAst) CallCombine(s1, s2 *ast.BlockStmt) *ast.CallExpr {
 }
 
 func (y *yieldAst) CallFor(cond, post, body ast.Expr) *ast.CallExpr {
-	if isNilNode(cond) && isNilNode(post) {
+	if isNil(cond) && isNil(post) {
 		return y.SeqCall(cstLoop, body)
 	}
-	if isNilNode(post) {
+	if isNil(post) {
 		return y.SeqCall(cstWhile, cond, body)
 	}
 	return y.SeqCall(cstFor, cond, post, body)
 }
 
 func (y *yieldAst) ForCondFun(cond ast.Expr) *ast.FuncLit {
-	if isNilNode(cond) {
+	if isNil(cond) {
 		return nil
 	}
 	return &ast.FuncLit{
@@ -123,7 +123,7 @@ func (y *yieldAst) ForCondFun(cond ast.Expr) *ast.FuncLit {
 }
 
 func (y *yieldAst) ForPostFun(post ast.Stmt) *ast.FuncLit {
-	if isNilNode(post) {
+	if isNil(post) {
 		return nil
 	}
 	return &ast.FuncLit{

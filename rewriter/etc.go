@@ -4,8 +4,8 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"reflect"
 
-	"github.com/goghcrow/go-ast-matcher"
 	"golang.org/x/tools/go/types/typeutil"
 )
 
@@ -14,6 +14,13 @@ import (
 var X = factor{}
 
 type factor struct{} // ast factory
+
+// Any
+//
+//	is legal identifier name, e.g., any := 1
+func (factor) Any() *ast.InterfaceType {
+	return &ast.InterfaceType{}
+}
 
 func (factor) Ident(name string) *ast.Ident {
 	return &ast.Ident{
@@ -25,6 +32,13 @@ func (factor) Index(x, idx ast.Expr) *ast.IndexExpr {
 	return &ast.IndexExpr{
 		X:     x,
 		Index: idx,
+	}
+}
+
+func (factor) Indices(x ast.Expr, indices ...ast.Expr) *ast.IndexListExpr {
+	return &ast.IndexListExpr{
+		X:       x,
+		Indices: indices,
 	}
 }
 
@@ -66,6 +80,14 @@ func (factor) Assign(tok token.Token, lhs, rhs ast.Expr) *ast.AssignStmt {
 		Lhs: []ast.Expr{lhs},
 		Tok: tok,
 		Rhs: []ast.Expr{rhs},
+	}
+}
+
+func (factor) Assign2(tok token.Token, lhs1, lhs2, rhs1, rhs2 ast.Expr) *ast.AssignStmt {
+	return &ast.AssignStmt{
+		Lhs: []ast.Expr{lhs1, lhs2},
+		Tok: tok,
+		Rhs: []ast.Expr{rhs1, rhs2},
 	}
 }
 
@@ -137,8 +159,12 @@ func (factor) Block(xs ...ast.Stmt) *ast.BlockStmt {
 }
 
 func (factor) Block1(x ast.Stmt, xs ...ast.Stmt) *ast.BlockStmt {
-	return &ast.BlockStmt{
-		List: append([]ast.Stmt{x}, xs...),
+	if isNil(x) {
+		return X.Block(xs...)
+	} else {
+		return &ast.BlockStmt{
+			List: append([]ast.Stmt{x}, xs...),
+		}
 	}
 }
 
@@ -154,6 +180,11 @@ func (factor) Stmt(n ast.Node) ast.Stmt {
 }
 
 // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Predication ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+
+func isUnderline(expr ast.Expr) bool {
+	ident, ok := expr.(*ast.Ident)
+	return ok && ident.Name == "_"
+}
 
 func isDefineStmt(stmt ast.Stmt) bool {
 	assign, ok := stmt.(*ast.AssignStmt)
@@ -210,8 +241,14 @@ func (s *stack[T]) len() int {
 
 // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Others ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
 
-func isNilNode(n ast.Node) bool {
-	return matcher.IsNilNode(n)
+func isNil(n any) bool {
+	if n == nil {
+		return true
+	}
+	if v := reflect.ValueOf(n); v.Kind() == reflect.Ptr && v.IsNil() {
+		return true
+	}
+	return false
 }
 
 func instanceof[T any](x any) (ok bool) {

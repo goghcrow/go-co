@@ -100,8 +100,8 @@ func optimizeDelayCall(m *matcher.Matcher) {
 								Results: []ast.Expr{
 									matcher.Bind(m, "return",
 										matcher.Or(m,
-											// call seq.Delay/Combine/For/While/Loop/Range
-											calleeOf(cstDelay, cstCombine, cstFor, cstWhile, cstLoop, cstRange),
+											// call seq.Delay/Combine/For/While/Loop/Range/Return
+											calleeOf(cstDelay, cstCombine, cstFor, cstWhile, cstLoop, cstRange, cstReturn),
 
 											// call seq.Bind with literal fst value
 											matcher.AndEx[matcher.CallExprPattern](m,
