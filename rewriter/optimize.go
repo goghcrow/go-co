@@ -5,7 +5,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/goghcrow/go-ast-matcher"
+	. "github.com/goghcrow/go-ast-matcher"
 	"github.com/goghcrow/go-ast-matcher/imports"
 	"golang.org/x/tools/go/ast/astutil"
 )
@@ -13,9 +13,9 @@ import (
 func optimize(
 	inputDir, outputDir string,
 	patterns []string,
-	opts ...matcher.MatchOption,
+	opts ...MatchOption,
 ) {
-	opts = append(opts, matcher.WithSuppressErrors())
+	opts = append(opts, WithSuppressErrors())
 	m := newMatcher(inputDir, outputDir, patterns, opts...)
 	seqPkg := m.All[pkgSeqPath]
 	if seqPkg == nil {
@@ -23,7 +23,7 @@ func optimize(
 		return
 	}
 
-	m.VisitAllFiles(func(m *matcher.Matcher, file *ast.File) {
+	m.VisitAllFiles(func(m *Matcher, file *ast.File) {
 		if !imports.Uses(m, file, seqPkg.Types) {
 			log.Printf("skip file: %s\n", m.Filename)
 			return
@@ -34,6 +34,7 @@ func optimize(
 		optimizeImports(m)
 		optimizeDelayCall(m)
 		optimizeBindCall(m)
+		etaReduction(m)
 
 		// 2. write file
 		log.Printf("write file: %s\n", m.Filename)
@@ -42,7 +43,7 @@ func optimize(
 	})
 }
 
-func optimizeImports(m *matcher.Matcher) {
+func optimizeImports(m *Matcher) {
 	imports.Clean(m, m.File)
 }
 
@@ -75,22 +76,22 @@ func optimizeImports(m *matcher.Matcher) {
 //					})===     )
 //				}))
 //			}
-func optimizeDelayCall(m *matcher.Matcher) {
-	var calleeOf func(...string) matcher.CallExprPattern
-	calleeOf = func(xs ...string) matcher.CallExprPattern {
+func optimizeDelayCall(m *Matcher) {
+	var calleeOf func(...string) CallExprPattern
+	calleeOf = func(xs ...string) CallExprPattern {
 		assert(len(xs) > 0)
-		callee := matcher.FuncCallee(m, pkgSeqPath, xs[0])
+		callee := FuncCallee(m, pkgSeqPath, xs[0])
 		if len(xs) == 1 {
 			return callee
 		} else {
-			return matcher.Or(m, callee, calleeOf(xs[1:]...))
+			return Or(m, callee, calleeOf(xs[1:]...))
 		}
 	}
 
-	constTrue := func(m *matcher.Matcher, n ast.Node, stack []ast.Node, binds matcher.Binds) bool { return true }
+	constTrue := func(m *Matcher, n ast.Node, stack []ast.Node, binds Binds) bool { return true }
 
-	delayCallWithReturnOnly := matcher.AndEx[matcher.CallExprPattern](m,
-		matcher.FuncCallee(m, pkgSeqPath, cstDelay),
+	delayCallWithReturnOnly := AndEx[CallExprPattern](m,
+		FuncCallee(m, pkgSeqPath, cstDelay),
 		&ast.CallExpr{
 			Args: []ast.Expr{
 				&ast.FuncLit{
@@ -98,18 +99,18 @@ func optimizeDelayCall(m *matcher.Matcher) {
 						List: []ast.Stmt{
 							&ast.ReturnStmt{
 								Results: []ast.Expr{
-									matcher.Bind(m, "return",
-										matcher.Or(m,
+									Bind(m, "return",
+										Or(m,
 											// call seq.Delay/Combine/For/While/Loop/Range/Return
 											calleeOf(cstDelay, cstCombine, cstFor, cstWhile, cstLoop, cstRange, cstReturn),
 
 											// call seq.Bind with literal fst value
-											matcher.AndEx[matcher.CallExprPattern](m,
-												matcher.FuncCallee(m, pkgSeqPath, cstBind),
+											AndEx[CallExprPattern](m,
+												FuncCallee(m, pkgSeqPath, cstBind),
 												&ast.CallExpr{
 													Args: []ast.Expr{
-														matcher.MkPattern[matcher.BasicLitPattern](m, constTrue),
-														matcher.Wildcard[matcher.ExprPattern](m),
+														MkPattern[BasicLitPattern](m, constTrue),
+														Wildcard[ExprPattern](m),
 													},
 												},
 											),
@@ -126,25 +127,25 @@ func optimizeDelayCall(m *matcher.Matcher) {
 
 	m.Match(
 		delayCallWithReturnOnly,
-		func(m *matcher.Matcher, c *astutil.Cursor, stack []ast.Node, binds matcher.Binds) {
+		func(m *Matcher, c *astutil.Cursor, stack []ast.Node, binds Binds) {
 			c.Replace(binds["return"])
 		},
 	)
 }
 
-func optimizeBindCall(m *matcher.Matcher) {
-	bindCallWithReturnOnly := matcher.AndEx[matcher.CallExprPattern](m,
-		matcher.FuncCallee(m, pkgSeqPath, cstBind),
+func optimizeBindCall(m *Matcher) {
+	bindCallWithReturnOnly := AndEx[CallExprPattern](m,
+		FuncCallee(m, pkgSeqPath, cstBind),
 		&ast.CallExpr{
 			Args: []ast.Expr{
-				matcher.Wildcard[matcher.ExprPattern](m),
+				Wildcard[ExprPattern](m),
 				&ast.FuncLit{
 					Body: &ast.BlockStmt{
 						List: []ast.Stmt{
 							&ast.ReturnStmt{
 								Results: []ast.Expr{
 									&ast.CallExpr{
-										Fun:  matcher.MkVar[matcher.ExprPattern](m, "fun"),
+										Fun:  MkVar[ExprPattern](m, "fun"),
 										Args: []ast.Expr{},
 									},
 								},
@@ -157,10 +158,81 @@ func optimizeBindCall(m *matcher.Matcher) {
 	)
 	m.Match(
 		bindCallWithReturnOnly,
-		func(m *matcher.Matcher, c *astutil.Cursor, stack []ast.Node, binds matcher.Binds) {
+		func(m *Matcher, c *astutil.Cursor, stack []ast.Node, binds Binds) {
 			bindCall := c.Node()
 			bindCall.(*ast.CallExpr).Args[1] = binds["fun"].(ast.Expr)
 			c.Replace(bindCall)
+		},
+	)
+}
+
+// fun(...args) { return return f(...args) }  ==>  f
+func etaReduction(m *Matcher) {
+	pattern := &ast.FuncLit{
+		Type: &ast.FuncType{
+			Params: MkVar[FieldListPattern](m, "params"),
+		},
+		Body: &ast.BlockStmt{
+			List: []ast.Stmt{
+				&ast.ReturnStmt{
+					Results: []ast.Expr{
+						&ast.CallExpr{
+							Fun:  MkVar[ExprPattern](m, "fun"),
+							Args: MkVar[ExprsPattern](m, "args"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// assume type-checked
+	matched := func(m *Matcher, paramsFields []*ast.Field, argsExprs []ast.Expr) bool {
+		if paramsFields == nil && argsExprs == nil {
+			return true
+		}
+		var args []*ast.Ident
+		for _, argExpr := range argsExprs {
+			arg, _ := argExpr.(*ast.Ident)
+			if arg == nil {
+				return false
+			}
+			args = append(args, arg)
+		}
+
+		var params []*ast.Ident
+		for _, paramGroup := range paramsFields {
+			for _, param := range paramGroup.Names {
+				params = append(params, param)
+			}
+		}
+
+		if len(args) != len(params) {
+			return false
+		}
+
+		for i, arg := range args {
+			param := params[i]
+			if arg.Name != param.Name {
+				return false
+			}
+			if m.ObjectOf(arg) != m.ObjectOf(param) {
+				return false
+			}
+		}
+
+		return true
+	}
+
+	m.Match(
+		pattern,
+		func(m *Matcher, c *astutil.Cursor, stack []ast.Node, binds Binds) {
+			assert(!isNil(binds["params"]) && !isNil(binds["args"]))
+			params := binds["params"].(*ast.FieldList).List
+			args := binds["args"].(ExprsNode)
+			if matched(m, params, args) {
+				c.Replace(binds["fun"])
+			}
 		},
 	)
 }

@@ -85,16 +85,19 @@ func (r *yieldRewriter) rewriteYieldFuncResult() {
 func (r *yieldRewriter) rewriteYieldFuncBody() {
 	// pass0
 	// rewrite `return` or `return nil` to return seq.Return() in yield func
+	//
 	// in the old implementation, we replace the trival block body of
-	// "ifStmt / forStmt / blockStmt..." to the rewriting result
-	// for keeping the rewiring result of returnStmt
-	// (return => return seq.Return[T]()) in rewriteStmt.
+	// "ifStmt / forStmt / blockStmt..." to the rewritten version (pass2)
+	// for keeping the returnStmt (return => return seq.Return[T]()) in rewriteStmt.
+	//
 	// now, we rewrite returnStmt in yieldFunc (pass0) instead of in rewriteStmt (pass2),
 	// so, the original node can be returned directly in trival branch of "if/for/block...".
 	// the code is more intuitive.
+	//
 	// in the old requireReturnNormal func, "return Normal()" is added in all kindTrival blocks,
-	// now, we only add for blocks not ending with returnStmt.
-	// why rewriting return first?
+	// now, we only add for non-terminating blocks.
+	//
+	// and why rewriting ReturnStmt firstly?
 	// cause of easy to recognize yield func before any rewriting
 	r.rewriteReturn(r.funcBody)
 
