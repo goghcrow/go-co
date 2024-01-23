@@ -128,13 +128,13 @@ func (r *yieldRewriter) rewriteStmts_(
 		rewriteNext(following)
 
 	case *ast.RangeStmt:
-		r.assert(false, stmt, "implement me")
+		r.assert(false, stmt, "%T implement me", stmt)
 
 	case *ast.SelectStmt, *ast.CommClause,
 		*ast.LabeledStmt, *ast.CaseClause,
 		*ast.SwitchStmt, *ast.TypeSwitchStmt,
 		*ast.DeferStmt:
-		r.assert(false, stmt, "implement me")
+		r.assert(false, stmt, "%T implement me", stmt)
 
 	// rewritten in pass0
 	// case *ast.ReturnStmt:

@@ -244,7 +244,18 @@ func (r *yieldRewriter) rewriteStmt(
 
 	case *ast.SwitchStmt:
 		// ↓↓ non-trival branch ↓↓
-		return r.rewriteSwitchStmt(stmt, children)
+		// &stmt.Init maybe ptr of typed nil
+		return r.rewriteSwitchStmt(
+			stmt, &stmt.Init, stmt.Tag, stmt.Body, &stmt.Switch, children,
+		)
+
+	case *ast.TypeSwitchStmt:
+		// ↓↓ non-trival branch ↓↓
+		trivalAssign := r.mustNoYield(stmt.Assign)
+		r.assert(trivalAssign, stmt.Assign, "yield not allowed")
+		return r.rewriteSwitchStmt(
+			stmt, &stmt.Init, stmt.Assign, stmt.Body, &stmt.Switch, children,
+		)
 
 	case *ast.ForStmt:
 		// ↓↓ non-trival branch ↓↓
@@ -255,7 +266,6 @@ func (r *yieldRewriter) rewriteStmt(
 
 	case *ast.SelectStmt, *ast.CommClause,
 		*ast.LabeledStmt, *ast.CaseClause,
-		*ast.TypeSwitchStmt,
 		*ast.DeferStmt:
 		r.assert(false, stmt, "%T implement me", stmt)
 		panic("make compiler happy")
@@ -391,13 +401,16 @@ func (r *yieldRewriter) rewriteIfStmt(
 }
 
 func (r *yieldRewriter) rewriteSwitchStmt(
-	stmt *ast.SwitchStmt,
+	stmt ast.Stmt, // switch | typeSwitch
+	init *ast.Stmt,
+	x ast.Node, // Tag of SwitchStmt | Assign of TypeSwitchStmt
+	body *ast.BlockStmt, // maybe modified
+	pos *token.Pos, // maybe modified
 	children *block,
 ) *block {
-	trivalInit := r.mustNoYield(stmt.Init)
 	allCaseTrival := true
 	var cases []ast.Stmt
-	for _, it := range stmt.Body.List {
+	for _, it := range body.List {
 		// yield is not supported in case expr, but
 		// yield has no return, no need to assert
 		clause := it.(*ast.CaseClause)
@@ -407,36 +420,37 @@ func (r *yieldRewriter) rewriteSwitchStmt(
 	}
 
 	// trival routine
+	trivalInit := r.mustNoYield(*init)
 	if trivalInit && allCaseTrival {
 		children.push(stmt, kindTrival)
 		return children
 	}
 
 	// extract out init stmt if present
-	if stmt.Init != nil {
+	if *init != nil {
 		// details referring to comment in rewriteInitStmt
-		assert(!isDefineStmt(stmt.Init))
-		children = r.rewriteStmt(stmt.Init, false, children)
+		assert(!isDefineStmt(*init))
+		children = r.rewriteStmt(*init, false, children)
 		r.assert(children != nil, stmt, "illegal state")
-		stmt.Init = nil
-		stmt.Switch = token.NoPos
+		*init = nil
+		*pos = token.NoPos
 	}
 
 	// stmt.Init non trival
 	if allCaseTrival {
-		switchStmt := X.SwitchStmt(
+		switchStmt := X.Switch(
 			nil, // extracted out
-			stmt.Tag,
-			stmt.Body,
+			x,
+			body,
 		)
 		children.push(switchStmt, kindTrival)
 		return children
 	}
 
 	// not all case trival
-	switchStmt := X.SwitchStmt(
+	switchStmt := X.Switch(
 		nil,
-		stmt.Tag,
+		x,
 		X.Block(cases...),
 	)
 	children = r.combineIfNecessary(children)

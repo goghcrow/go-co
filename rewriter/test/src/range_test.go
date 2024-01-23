@@ -114,60 +114,60 @@ func TestRangeSlice(t *testing.T) {
 	}
 }
 
-// func TestRangeArray(t *testing.T) {
-// 	{
-// 		g := func() (_ Iter[int]) {
-// 			var xs [0]int
-// 			for range xs {
-// 				Yield(1)
-// 			}
-// 			return
-// 		}
-// 		assertEqual(t, iter2slice(g()), []int(nil))
-// 	}
-//
-// 	xs := [5]int{1, 2, 3, 4, 5}
-//
-// 	{
-// 		g := func() (_ Iter[int]) {
-// 			for range xs {
-// 				Yield(1)
-// 			}
-// 			return
-// 		}
-// 		assertEqual(t, iter2slice(g()), []int{1, 1, 1, 1, 1})
-// 	}
-//
-// 	{
-// 		g := func() (_ Iter[int]) {
-// 			for k := range xs {
-// 				Yield(k)
-// 			}
-// 			return
-// 		}
-// 		assertEqual(t, iter2slice(g()), []int{0, 1, 2, 3, 4})
-// 	}
-//
-// 	{
-// 		g := func() (_ Iter[int]) {
-// 			for k, _ := range xs {
-// 				Yield(k)
-// 			}
-// 			return
-// 		}
-// 		assertEqual(t, iter2slice(g()), []int{0, 1, 2, 3, 4})
-// 	}
-//
-// 	{
-// 		g := func() (_ Iter[int]) {
-// 			for _, v := range xs {
-// 				Yield(v)
-// 			}
-// 			return
-// 		}
-// 		assertEqual(t, iter2slice(g()), []int{1, 2, 3, 4, 5})
-// 	}
-// }
+func TestRangeArray(t *testing.T) {
+	{
+		g := func() (_ Iter[int]) {
+			var xs [0]int
+			for range xs {
+				Yield(1)
+			}
+			return
+		}
+		assertEqual(t, iter2slice(g()), []int(nil))
+	}
+
+	xs := [5]int{1, 2, 3, 4, 5}
+
+	{
+		g := func() (_ Iter[int]) {
+			for range xs {
+				Yield(1)
+			}
+			return
+		}
+		assertEqual(t, iter2slice(g()), []int{1, 1, 1, 1, 1})
+	}
+
+	{
+		g := func() (_ Iter[int]) {
+			for k := range xs {
+				Yield(k)
+			}
+			return
+		}
+		assertEqual(t, iter2slice(g()), []int{0, 1, 2, 3, 4})
+	}
+
+	{
+		g := func() (_ Iter[int]) {
+			for k, _ := range xs {
+				Yield(k)
+			}
+			return
+		}
+		assertEqual(t, iter2slice(g()), []int{0, 1, 2, 3, 4})
+	}
+
+	{
+		g := func() (_ Iter[int]) {
+			for _, v := range xs {
+				Yield(v)
+			}
+			return
+		}
+		assertEqual(t, iter2slice(g()), []int{1, 2, 3, 4, 5})
+	}
+}
 
 func TestRangeMap(t *testing.T) {
 	{
@@ -232,5 +232,46 @@ func TestRangeMap(t *testing.T) {
 		s := iter2slice(g())
 		sort.Ints(s)
 		assertEqual(t, s, []int{1, 2, 3, 4, 5})
+	}
+}
+
+func TestRangeChan(t *testing.T) {
+	mkCh := func(len int) <-chan int {
+		xs := make(chan int, len)
+		for i := 0; i < len; i++ {
+			xs <- i
+		}
+		close(xs)
+		return xs
+	}
+
+	{
+		g := func() (_ Iter[int]) {
+			for range mkCh(0) {
+				Yield(1)
+			}
+			return
+		}
+		assertEqual(t, iter2slice(g()), []int(nil))
+	}
+
+	{
+		g := func() (_ Iter[int]) {
+			for range mkCh(5) {
+				Yield(1)
+			}
+			return
+		}
+		assertEqual(t, iter2slice(g()), []int{1, 1, 1, 1, 1})
+	}
+
+	{
+		g := func() (_ Iter[int]) {
+			for v := range mkCh(5) {
+				Yield(v)
+			}
+			return
+		}
+		assertEqual(t, iter2slice(g()), []int{0, 1, 2, 3, 4})
 	}
 }

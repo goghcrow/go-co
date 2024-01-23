@@ -50,24 +50,6 @@ func (s *SliceIter[V]) Current() Pair[int, V] {
 	return Pair[int, V]{Key: s.idx, Val: s.slice[s.idx]}
 }
 
-type ArrayIter[V any] struct {
-	array reflect.Value
-	idx   int
-}
-
-func NewArrayIter[V any](array any) Iterator[Pair[int, V]] {
-	return &ArrayIter[V]{array: reflect.ValueOf(array), idx: -1}
-}
-
-func (a *ArrayIter[V]) MoveNext() bool {
-	a.idx++
-	return a.idx < a.array.Len()
-}
-
-func (a *ArrayIter[V]) Current() Pair[int, V] {
-	return Pair[int, V]{Key: a.idx, Val: a.array.Index(a.idx).Interface().(V)}
-}
-
 type StringIter struct {
 	str []rune
 	idx int
@@ -91,7 +73,7 @@ type IntegerIter struct {
 	i int
 }
 
-func NewIntegerIter(n int) Iterator[int] {
+func NewIntegerIter(n int) Iterator[Pair[int, any]] {
 	return &IntegerIter{n: n}
 }
 
@@ -100,16 +82,16 @@ func (i *IntegerIter) MoveNext() bool {
 	return i.i <= i.n
 }
 
-func (i *IntegerIter) Current() int {
-	return i.i
+func (i *IntegerIter) Current() Pair[int, any] {
+	return Pair[int, any]{Key: i.i}
 }
 
 type ChanIter[V any] struct {
-	ch chan V
+	ch <-chan V
 	v  V
 }
 
-func NewChanIter[V any](ch chan V) Iterator[V] {
+func NewChanIter[V any](ch <-chan V) Iterator[Pair[V, any]] {
 	return &ChanIter[V]{ch: ch}
 }
 
@@ -118,6 +100,6 @@ func (c *ChanIter[V]) MoveNext() (ok bool) {
 	return
 }
 
-func (c *ChanIter[V]) Current() V {
-	return c.v
+func (c *ChanIter[V]) Current() Pair[V, any] {
+	return Pair[V, any]{Key: c.v}
 }

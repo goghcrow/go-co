@@ -232,60 +232,118 @@ func TestRangeSlice(t *testing.T) {
 	}
 }
 
-// func TestRangeArray(t *testing.T) {
-// 	{
-// 		g := func() (_ Iter[int]) {
-// 			var xs [0]int
-// 			for range xs {
-// 				Yield(1)
-// 			}
-// 			return
-// 		}
-// 		assertEqual(t, iter2slice(g()), []int(nil))
-// 	}
-//
-// 	xs := [5]int{1, 2, 3, 4, 5}
-//
-// 	{
-// 		g := func() (_ Iter[int]) {
-// 			for range xs {
-// 				Yield(1)
-// 			}
-// 			return
-// 		}
-// 		assertEqual(t, iter2slice(g()), []int{1, 1, 1, 1, 1})
-// 	}
-//
-// 	{
-// 		g := func() (_ Iter[int]) {
-// 			for k := range xs {
-// 				Yield(k)
-// 			}
-// 			return
-// 		}
-// 		assertEqual(t, iter2slice(g()), []int{0, 1, 2, 3, 4})
-// 	}
-//
-// 	{
-// 		g := func() (_ Iter[int]) {
-// 			for k, _ := range xs {
-// 				Yield(k)
-// 			}
-// 			return
-// 		}
-// 		assertEqual(t, iter2slice(g()), []int{0, 1, 2, 3, 4})
-// 	}
-//
-// 	{
-// 		g := func() (_ Iter[int]) {
-// 			for _, v := range xs {
-// 				Yield(v)
-// 			}
-// 			return
-// 		}
-// 		assertEqual(t, iter2slice(g()), []int{1, 2, 3, 4, 5})
-// 	}
-// }
+func TestRangeArray(t *testing.T) {
+	{
+		g := func() (_ ʂɘʠ.Iterator[int]) {
+			return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+				var xs [0]int
+				ɪʇ := ʂɘʠ.NewSliceIter(xs[:])
+				return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.While[int](func() bool {
+						return ɪʇ.MoveNext()
+					}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+						return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Normal[int]()
+						})
+					}))
+				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.Return[int]()
+				}))
+			}))
+
+		}
+		assertEqual(t, iter2slice(g()), []int(nil))
+	}
+
+	xs := [5]int{1, 2, 3, 4, 5}
+
+	{
+		g := func() (_ ʂɘʠ.Iterator[int]) {
+			return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+				ɪʇ := ʂɘʠ.NewSliceIter(xs[:])
+				return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.While[int](func() bool {
+						return ɪʇ.MoveNext()
+					}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+						return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Normal[int]()
+						})
+					}))
+				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.Return[int]()
+				}))
+			}))
+
+		}
+		assertEqual(t, iter2slice(g()), []int{1, 1, 1, 1, 1})
+	}
+
+	{
+		g := func() (_ ʂɘʠ.Iterator[int]) {
+			return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+				ɪʇ := ʂɘʠ.NewSliceIter(xs[:])
+				return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.While[int](func() bool {
+						return ɪʇ.MoveNext()
+					}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+						k := ɪʇ.Current().Key
+						return ʂɘʠ.Bind[int](k, func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Normal[int]()
+						})
+					}))
+				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.Return[int]()
+				}))
+			}))
+
+		}
+		assertEqual(t, iter2slice(g()), []int{0, 1, 2, 3, 4})
+	}
+
+	{
+		g := func() (_ ʂɘʠ.Iterator[int]) {
+			return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+				ɪʇ := ʂɘʠ.NewSliceIter(xs[:])
+				return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.While[int](func() bool {
+						return ɪʇ.MoveNext()
+					}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+						k := ɪʇ.Current().Key
+						return ʂɘʠ.Bind[int](k, func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Normal[int]()
+						})
+					}))
+				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.Return[int]()
+				}))
+			}))
+
+		}
+		assertEqual(t, iter2slice(g()), []int{0, 1, 2, 3, 4})
+	}
+
+	{
+		g := func() (_ ʂɘʠ.Iterator[int]) {
+			return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+				ɪʇ := ʂɘʠ.NewSliceIter(xs[:])
+				return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.While[int](func() bool {
+						return ɪʇ.MoveNext()
+					}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+						v := ɪʇ.Current().Val
+						return ʂɘʠ.Bind[int](v, func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Normal[int]()
+						})
+					}))
+				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.Return[int]()
+				}))
+			}))
+
+		}
+		assertEqual(t, iter2slice(g()), []int{1, 2, 3, 4, 5})
+	}
+}
 
 func TestRangeMap(t *testing.T) {
 	{
@@ -408,5 +466,83 @@ func TestRangeMap(t *testing.T) {
 		s := iter2slice(g())
 		sort.Ints(s)
 		assertEqual(t, s, []int{1, 2, 3, 4, 5})
+	}
+}
+
+func TestRangeChan(t *testing.T) {
+	mkCh := func(len int) <-chan int {
+		xs := make(chan int, len)
+		{
+			i := 0
+			for ; i < len; i++ {
+				xs <- i
+			}
+		}
+		close(xs)
+		return xs
+	}
+
+	{
+		g := func() (_ ʂɘʠ.Iterator[int]) {
+			return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+				ɪʇ := ʂɘʠ.NewChanIter(mkCh(0))
+				return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.While[int](func() bool {
+						return ɪʇ.MoveNext()
+					}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+						return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Normal[int]()
+						})
+					}))
+				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.Return[int]()
+				}))
+			}))
+
+		}
+		assertEqual(t, iter2slice(g()), []int(nil))
+	}
+
+	{
+		g := func() (_ ʂɘʠ.Iterator[int]) {
+			return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+				ɪʇ := ʂɘʠ.NewChanIter(mkCh(5))
+				return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.While[int](func() bool {
+						return ɪʇ.MoveNext()
+					}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+						return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Normal[int]()
+						})
+					}))
+				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.Return[int]()
+				}))
+			}))
+
+		}
+		assertEqual(t, iter2slice(g()), []int{1, 1, 1, 1, 1})
+	}
+
+	{
+		g := func() (_ ʂɘʠ.Iterator[int]) {
+			return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+				ɪʇ := ʂɘʠ.NewChanIter(mkCh(5))
+				return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.While[int](func() bool {
+						return ɪʇ.MoveNext()
+					}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+						v := ɪʇ.Current().Key
+						return ʂɘʠ.Bind[int](v, func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Normal[int]()
+						})
+					}))
+				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.Return[int]()
+				}))
+			}))
+
+		}
+		assertEqual(t, iter2slice(g()), []int{0, 1, 2, 3, 4})
 	}
 }

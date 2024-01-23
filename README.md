@@ -11,15 +11,15 @@ Rewrite control flow to monadic func invoking.
 - [x] IfStmt
 - [x] SwitchStmt
   - [ ] Fallthrough
-- [ ] TypeSwitchStmt
+- [x] TypeSwitchStmt
 - [x] ForStmt
 - [x] RangeStmt
   - [x] string
   - [x] slice
   - [x] map
-  - [ ] array
-  - [ ] channel
-  - [ ] integer
+  - [x] array
+  - [x] integer
+  - [x] channel
   - [ ] range func
 - [x] BlockStmt
 - [x] Break / Continue 

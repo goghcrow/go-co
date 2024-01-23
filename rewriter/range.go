@@ -25,6 +25,14 @@ func (r *yieldRewriter) ignoreKeyVal(k, v ast.Expr) (bool, bool) {
 }
 
 func (r *yieldRewriter) rewriteRanges(block *ast.BlockStmt) {
+	do := func(c *astutil.Cursor, n *ast.RangeStmt, ctor string, arg ast.Expr) {
+		factory := r.SeqSelect(ctor)
+		iter := X.Call(factory, arg)
+		init, forStmt := r.rewriteRangeToForIter(n, iter)
+		c.InsertBefore(init)
+		c.Replace(forStmt)
+	}
+
 	astutil.Apply(block, nil, func(c *astutil.Cursor) bool {
 		switch n := c.Node().(type) {
 		case *ast.RangeStmt:
@@ -36,43 +44,21 @@ func (r *yieldRewriter) rewriteRanges(block *ast.BlockStmt) {
 			case *types.Basic:
 				switch {
 				case ty.Info()&types.IsString != 0:
-					factory := r.SeqSelect(cstNewStringIter)
-					init, forStmt := r.rewriteRangeToForIter(n, factory)
-					c.InsertBefore(init)
-					c.Replace(forStmt)
+					do(c, n, cstNewStringIter, n.X)
 				case ty.Info()&types.IsInteger != 0:
-					panic("implement me")
+					// >= 1.22 only, but no release, need test
+					do(c, n, cstNewIntegerIter, n.X)
 				}
 			case *types.Array:
-				panic("implement me")
-				// factory := X.Index(
-				// 	r.SeqSelect(cstNewArrayIter),
-				// 	X.Any(), // ty.Elem()
-				// )
-				// init, forStmt := r.rewriteRangeToForIter(n, factory)
-				// c.InsertBefore(init)
-				// c.Replace(forStmt)
+				// typing workaround for abstract generic array iter
+				typeInferedSlice := &ast.SliceExpr{X: n.X}
+				do(c, n, cstNewSliceIter, typeInferedSlice)
 			case *types.Slice:
-				// X.Index(
-				// 	r.SeqSelect(cstNewSliceIter),
-				// 	ty.Elem().String(), // todo type parameter
-				// ),
-				factory := r.SeqSelect(cstNewSliceIter)
-				init, forStmt := r.rewriteRangeToForIter(n, factory)
-				c.InsertBefore(init)
-				c.Replace(forStmt)
+				do(c, n, cstNewSliceIter, n.X)
 			case *types.Map:
-				// X.Indices(
-				// 	r.SeqSelect(cstNewSliceIter),
-				// 	ty.Key(),
-				// 	ty.Elem(),
-				// ),
-				factory := r.SeqSelect(cstNewMapIter)
-				init, forStmt := r.rewriteRangeToForIter(n, factory)
-				c.InsertBefore(init)
-				c.Replace(forStmt)
+				do(c, n, cstNewMapIter, n.X)
 			case *types.Chan:
-				panic("implement me")
+				do(c, n, cstNewChanIter, n.X)
 			case *types.Signature:
 				panic("implement me: range func")
 			}
@@ -83,20 +69,17 @@ func (r *yieldRewriter) rewriteRanges(block *ast.BlockStmt) {
 
 func (r *yieldRewriter) rewriteRangeToForIter(
 	n *ast.RangeStmt,
-	iterFactory ast.Expr,
+	iter ast.Expr,
 ) (
 	init *ast.AssignStmt,
 	forStmt *ast.ForStmt,
 ) {
 	// r.rewriter.NewIdent()
-	iter := X.Ident(r.gensym(cstIterVar))
-	current := X.Select(iter, cstCurrent)
-	next := X.Select(iter, cstMoveNext)
+	it := X.Ident(r.gensym(cstIterVar))
+	current := X.Select(it, cstCurrent)
+	next := X.Select(it, cstMoveNext)
 
-	init = X.Define(
-		iter,
-		X.Call(iterFactory, n.X),
-	)
+	init = X.Define(it, iter)
 	cond := X.Call(next)
 
 	var kv *ast.AssignStmt

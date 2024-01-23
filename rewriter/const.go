@@ -10,11 +10,12 @@ const (
 	cstPairKey = "Key"
 	cstPairVal = "Val"
 
-	cstIterator      = "Iterator"
-	cstNewStringIter = "NewStringIter"
-	cstNewSliceIter  = "NewSliceIter"
-	cstNewArrayIter  = "NewArrayIter"
-	cstNewMapIter    = "NewMapIter"
+	cstIterator       = "Iterator"
+	cstNewStringIter  = "NewStringIter"
+	cstNewIntegerIter = "NewIntegerIter"
+	cstNewSliceIter   = "NewSliceIter"
+	cstNewMapIter     = "NewMapIter"
+	cstNewChanIter    = "NewChanIter"
 
 	cstSeq      = "Seq"
 	cstStart    = "Start"

@@ -226,6 +226,13 @@ func (r *rewriter) rewriteInitStmt(c *astutil.Cursor) bool {
 			n.Switch = token.NoPos
 			c.Replace(X.Block(init, n))
 		}
+	case *ast.TypeSwitchStmt:
+		if isDefineStmt(n.Init) {
+			init := n.Init
+			n.Init = nil
+			n.Switch = token.NoPos
+			c.Replace(X.Block(init, n))
+		}
 	}
 	return true
 }

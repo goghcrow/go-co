@@ -15,13 +15,6 @@ var X = factor{}
 
 type factor struct{} // ast factory
 
-// Any
-//
-//	is legal identifier name, e.g., any := 1
-func (factor) Any() *ast.InterfaceType {
-	return &ast.InterfaceType{}
-}
-
 func (factor) Ident(name string) *ast.Ident {
 	return &ast.Ident{
 		Name: name,
@@ -126,6 +119,21 @@ func (factor) Case(list []ast.Expr, body []ast.Stmt) *ast.CaseClause {
 	}
 }
 
+func (factor) Switch(
+	init ast.Stmt,
+	x ast.Node,
+	body *ast.BlockStmt,
+) ast.Stmt {
+	switch x := x.(type) {
+	case ast.Expr:
+		return X.SwitchStmt(init, x, body)
+	case ast.Stmt:
+		return X.TypeSwitchStmt(init, x, body)
+	default:
+		panic("invalid switch")
+	}
+}
+
 func (factor) SwitchStmt(
 	init ast.Stmt,
 	tag ast.Expr,
@@ -135,6 +143,18 @@ func (factor) SwitchStmt(
 		Init: init,
 		Tag:  tag,
 		Body: body,
+	}
+}
+
+func (factor) TypeSwitchStmt(
+	init ast.Stmt,
+	assign ast.Stmt,
+	body *ast.BlockStmt,
+) *ast.TypeSwitchStmt {
+	return &ast.TypeSwitchStmt{
+		Init:   init,
+		Assign: assign,
+		Body:   body,
 	}
 }
 
