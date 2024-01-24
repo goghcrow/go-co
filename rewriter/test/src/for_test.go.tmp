@@ -70,7 +70,6 @@ func TestForBodyScope(t *testing.T) {
 							} else {
 								return ʂɘʠ.Break[int]()
 							}
-							return ʂɘʠ.Normal[int]()
 						})
 					}))
 				})
@@ -105,7 +104,6 @@ func TestForBodyScope1(t *testing.T) {
 							} else {
 								return ʂɘʠ.Break[int]()
 							}
-							return ʂɘʠ.Normal[int]()
 						})
 					}))
 				})

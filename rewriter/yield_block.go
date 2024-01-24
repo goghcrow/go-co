@@ -140,7 +140,7 @@ func (b *block) mayContainsYield() bool {
 	return false
 }
 
-func (b *block) needCombine() bool {
+func (b *block) combineRequired() bool {
 	return b.len() > 0 && b.lastKind() != kindTrival
 }
 
@@ -148,7 +148,7 @@ func (b *block) mustNoYield() bool {
 	return !b.mayContainsYield()
 }
 
-func (b *block) requireReturnNormal(r *rewriter) bool {
+func (b *block) returnNormalRequired(r *rewriter) bool {
 	assert(b.kind == kindDelay ||
 		b.kind == kindFor || b.kind == kindIf)
 

@@ -223,7 +223,6 @@ func endlessForWithContinueBreakYield() ʂɘʠ.Iterator[int] {
 						return ʂɘʠ.Normal[int]()
 					})
 				}
-				return ʂɘʠ.Normal[int]()
 			}))
 		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 			return ʂɘʠ.Return[int]()
@@ -243,7 +242,6 @@ func endlessForWithYieldBreak() ʂɘʠ.Iterator[int] {
 				} else {
 					return ʂɘʠ.Break[int]()
 				}
-				return ʂɘʠ.Normal[int]()
 			}))
 		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 			return ʂɘʠ.Return[int]()
@@ -263,7 +261,6 @@ func endlessForWithBreakYield() ʂɘʠ.Iterator[int] {
 						return ʂɘʠ.Normal[int]()
 					})
 				}
-				return ʂɘʠ.Normal[int]()
 			}))
 		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 			return ʂɘʠ.Return[int]()
@@ -291,7 +288,6 @@ func forWithContinueBreakYield() ʂɘʠ.Iterator[int] {
 							return ʂɘʠ.Normal[int]()
 						})
 					}
-					return ʂɘʠ.Normal[int]()
 				}))
 			})
 		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {

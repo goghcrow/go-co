@@ -57,7 +57,7 @@ func (r *yieldRewriter) rewriteStmts_(
 		// we mark the blockStmt containing yield with kindYield instead of kindDelay
 		// to keep the logical consistency,
 		// so, all kindDelay shouldn't appear in block.List, and
-		// no need to check kindDelay in requireReturnNormal
+		// no need to check kindDelay in returnNormalRequired
 		callDelay := r.CallDelay(following.block)
 		children.pushReturn(callDelay, kindYield /*notice: not kindDelay*/)
 		rewriteNext(children)

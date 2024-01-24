@@ -19,7 +19,7 @@ type yieldRewriter struct {
 	// file scope cache
 	rewriteRetCache map[ast.Node]bool
 
-	symCnt int
+	symCnt int // for unique symbol
 }
 
 func mkYieldRewriter(r *rewriter) *yieldRewriter {
@@ -38,7 +38,9 @@ func (r *yieldRewriter) rewrite(c *astutil.Cursor) bool {
 			return true
 		}
 		if r.rewriter.isYieldFunc(typeof(n.Name)) {
+			// src := r.rewriter.ShowNode(n)
 			r.rewriteYieldFunc(n.Type, n.Body)
+			// X.AppendComment(&n.Doc, X.Comment(src))
 			c.Replace(n)
 		}
 		return true
@@ -94,7 +96,7 @@ func (r *yieldRewriter) rewriteYieldFuncBody() {
 	// so, the original node can be returned directly in trival branch of "if/for/block...".
 	// the code is more intuitive.
 	//
-	// in the old requireReturnNormal func, "return Normal()" is added in all kindTrival blocks,
+	// in the old returnNormalRequired func, "return Normal()" is added in all kindTrival blocks,
 	// now, we only add for non-terminating blocks.
 	//
 	// and why rewriting ReturnStmt firstly?
@@ -177,7 +179,7 @@ func (r *yieldRewriter) rewriteStmt(
 		// we mark the blockStmt containing yield with kindYield instead of kindDelay
 		// to keep the logical consistency,
 		// so, all kindDelay shouldn't appear in block.List, and
-		// no need to check kindDelay in requireReturnNormal
+		// no need to check kindDelay in returnNormalRequired
 		callDelay := r.CallDelay(following.block)
 		children.pushReturn(callDelay, kindYield /*notice: not kindDelay*/)
 		return children
@@ -301,13 +303,12 @@ func (r *yieldRewriter) rewriteBlockStmt(
 // additional return-normal() required
 // when last stmt is kindIf / kindSwitch / kindTrival
 func (r *yieldRewriter) generateLastNormalIfNecessary(children *block) {
-	if children.requireReturnNormal(r.rewriter) {
+	if children.returnNormalRequired(r.rewriter) {
 		// markCombined manually, cause of no need to check
 		// when normal return required
 		children.markCombined()
 		// return Normal[T]()
-		callNormal := r.CallNormal()
-		children.pushReturn(callNormal, kindNormal)
+		children.pushReturn(r.callNormal, kindNormal)
 	}
 }
 func (r *yieldRewriter) checkYieldCall(call *ast.CallExpr) {
@@ -506,7 +507,7 @@ func (r *yieldRewriter) rewriteForStmt(
 		return children
 	}
 
-	if body.needCombine() {
+	if body.combineRequired() {
 		// combine(delay(body), delay(post))
 		// rewriting by seq.Combine avoiding control flow analysis (merging body & post)
 
@@ -548,7 +549,7 @@ func (r *yieldRewriter) rewriteForStmt(
 
 func (r *yieldRewriter) combineIfNecessary(children *block) *block {
 	children.markCombined()
-	if !children.needCombine() {
+	if !children.combineRequired() {
 		return children
 	}
 
@@ -630,6 +631,29 @@ func (r *yieldRewriter) rewriteReturn(body *ast.BlockStmt) {
 	})
 }
 
+//	for {
+//			if true {
+//				continue
+//			} else {
+//				Yield(0)
+//			}
+//		}
+//
+// WOULD BE REWRITTEN TO
+//
+//	Loop[int](Delay[int](func() Seq[int] {
+//		if true {
+//			return Continue[int]()
+//		} else {
+//			return Bind[int](0, Normal[int])
+//		}
+//		return Normal[int]() // notice here: redundant return
+//	}))
+//
+// because, when terminating checking in pass2, code as follows
+// `if true { continue } else { return Bind(...) }`
+// but, continue will be rewritten to return Continue() in pass3,
+// so, extra terminating checking is required to keep code clean
 func (r *yieldRewriter) rewriteBreakContinues(body *ast.BlockStmt) {
 	var (
 		loopStack = mkStack[bool](false) // default in trival for
@@ -641,6 +665,10 @@ func (r *yieldRewriter) rewriteBreakContinues(body *ast.BlockStmt) {
 		enterSwitch = switchStack.push
 		exitSwitch  = switchStack.pop
 		inSwitch    = switchStack.top
+
+		funcLitStack = mkStack[*ast.FuncLit](nil)
+		enterFuncLit = funcLitStack.push
+		exitFuncLit  = funcLitStack.pop
 
 		doRewrite = func(n *ast.BranchStmt) (_ ast.Node) {
 			switch n.Tok {
@@ -668,11 +696,27 @@ func (r *yieldRewriter) rewriteBreakContinues(body *ast.BlockStmt) {
 			}
 			return
 		}
+
+		rmRedundantReturn = func(body *ast.BlockStmt) {
+			if len(body.List) == 0 {
+				return
+			}
+			last := body.List[len(body.List)-1]
+			if ret, ok := last.(*ast.ReturnStmt); ok {
+				isRetNormal := len(ret.Results) == 1 && ret.Results[0] == r.callNormal
+				if isRetNormal {
+					stmts := body.List[:len(body.List)-1]
+					if r.rewriter.isTerminating(X.Block(stmts...)) {
+						body.List = stmts
+					}
+				}
+			}
+		}
 	)
 
 	astutil.Apply(body, func(c *astutil.Cursor) bool {
 		n := c.Node()
-		switch n.(type) {
+		switch n := n.(type) {
 		case *ast.ForStmt, *ast.RangeStmt:
 			enterLoop(true)
 		case *ast.SwitchStmt, *ast.TypeSwitchStmt:
@@ -680,6 +724,7 @@ func (r *yieldRewriter) rewriteBreakContinues(body *ast.BlockStmt) {
 		case *ast.FuncLit:
 			enterLoop(false)
 			enterSwitch(false)
+			enterFuncLit(n)
 		}
 		return true
 	}, func(c *astutil.Cursor) bool {
@@ -692,10 +737,18 @@ func (r *yieldRewriter) rewriteBreakContinues(body *ast.BlockStmt) {
 		case *ast.FuncLit:
 			exitLoop()
 			exitSwitch()
+			exitFuncLit()
 		case *ast.BranchStmt:
 			n1 := doRewrite(n)
 			if n1 != nil {
 				c.Replace(n1)
+
+				top := funcLitStack.top()
+				if top == nil { // init-value,  in outer yield func
+					rmRedundantReturn(body)
+				} else { // in funcLit
+					rmRedundantReturn(top.Body)
+				}
 			}
 		}
 		return true

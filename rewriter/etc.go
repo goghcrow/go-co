@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"go/types"
 	"reflect"
+	"strings"
 
 	"golang.org/x/tools/go/types/typeutil"
 )
@@ -197,6 +198,30 @@ func (factor) Stmt(n ast.Node) ast.Stmt {
 	default:
 		panic("invalid")
 	}
+}
+
+func (factor) Comment(text string) *ast.Comment {
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		lines[i] = "// " + line
+	}
+	text = strings.Join(lines, "\n")
+	return &ast.Comment{
+		Text: text,
+	}
+}
+
+func (factor) Comments(xs ...*ast.Comment) *ast.CommentGroup {
+	return &ast.CommentGroup{
+		List: xs,
+	}
+}
+
+func (factor) AppendComment(doc **ast.CommentGroup, comment *ast.Comment) {
+	if *doc == nil {
+		*doc = X.Comments()
+	}
+	(*doc).List = append((*doc).List, comment)
 }
 
 // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Predication ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓

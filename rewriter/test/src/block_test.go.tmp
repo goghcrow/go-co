@@ -70,7 +70,6 @@ func TestYieldBlock(t *testing.T) {
 							} else {
 								return ʂɘʠ.Break[int]()
 							}
-							return ʂɘʠ.Normal[int]()
 						})
 					}))
 				})
@@ -105,7 +104,6 @@ func TestYieldBlock2(t *testing.T) {
 								} else {
 									return ʂɘʠ.Break[int]()
 								}
-								return ʂɘʠ.Normal[int]()
 							})
 						}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 							return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {

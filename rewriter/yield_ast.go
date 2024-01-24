@@ -7,13 +7,17 @@ import (
 type yieldAst struct {
 	seqImportedName string
 	funRetParamTy   ast.Expr // generator element type
+
+	callNormal *ast.CallExpr // for fast equivalence check
 }
 
 func mkYieldAst(seqName string, retParamTy ast.Expr) *yieldAst {
-	return &yieldAst{
+	a := &yieldAst{
 		seqImportedName: seqName,
 		funRetParamTy:   retParamTy,
 	}
+	a.callNormal = a.CallNormal()
+	return a
 }
 
 func (y *yieldAst) SeqSelect(name string) ast.Expr {

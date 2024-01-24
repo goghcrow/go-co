@@ -33,7 +33,7 @@ func optimize(
 		log.Printf("visit file: %s\n", m.Filename)
 		optimizeImports(m)
 		optimizeDelayCall(m)
-		optimizeBindCall(m)
+		// optimizeBindCall(m)
 		etaReduction(m)
 
 		// 2. write file
@@ -90,74 +90,81 @@ func optimizeDelayCall(m *Matcher) {
 
 	constTrue := func(m *Matcher, n ast.Node, stack []ast.Node, binds Binds) bool { return true }
 
-	delayCallWithReturnOnly := AndEx[CallExprPattern](m,
+	// Currently only the first parameter of Bind has side effects
+	noEffectBindCall := AndEx[CallExprPattern](m,
+		FuncCallee(m, pkgSeqPath, cstBind),
+		// seq.Bind[T](literal, ...)
+		&ast.CallExpr{
+			Args: []ast.Expr{
+				MkPattern[BasicLitPattern](m, constTrue), // literal
+				Wildcard[ExprPattern](m),                 // whatever
+			},
+		},
+	)
+	noEffectCombinatorCall := calleeOf(
+		cstDelay,
+		cstCombine,
+		cstFor,
+		cstWhile,
+		cstLoop,
+		cstRange,
+		cstReturn,
+	)
+	delayCallWithNoEffectDirectReturn := AndEx[CallExprPattern](m,
 		FuncCallee(m, pkgSeqPath, cstDelay),
 		&ast.CallExpr{
 			Args: []ast.Expr{
 				&ast.FuncLit{
-					Body: &ast.BlockStmt{
-						List: []ast.Stmt{
-							&ast.ReturnStmt{
-								Results: []ast.Expr{
-									Bind(m, "return",
-										Or(m,
-											// call seq.Delay/Combine/For/While/Loop/Range/Return
-											calleeOf(cstDelay, cstCombine, cstFor, cstWhile, cstLoop, cstRange, cstReturn),
-
-											// call seq.Bind with literal fst value
-											AndEx[CallExprPattern](m,
-												FuncCallee(m, pkgSeqPath, cstBind),
-												&ast.CallExpr{
-													Args: []ast.Expr{
-														MkPattern[BasicLitPattern](m, constTrue),
-														Wildcard[ExprPattern](m),
-													},
-												},
-											),
-										),
-									),
-								},
-							},
-						},
-					},
+					Body: X.Block(
+						X.Return(
+							Bind(m, "return",
+								Or(m,
+									noEffectCombinatorCall, // call seq.Delay/Combine/For/While/Loop/Range/Return
+									// Or
+									noEffectBindCall, // call seq.Bind with literal fst value
+								),
+							),
+						),
+					),
 				},
 			},
 		},
 	)
 
 	m.Match(
-		delayCallWithReturnOnly,
+		delayCallWithNoEffectDirectReturn,
 		func(m *Matcher, c *astutil.Cursor, stack []ast.Node, binds Binds) {
 			c.Replace(binds["return"])
 		},
 	)
 }
 
+// eat reduction overrides this particularity optimization
+// no longer required
 func optimizeBindCall(m *Matcher) {
-	bindCallWithReturnOnly := AndEx[CallExprPattern](m,
+	// Bind[T](*, func() Seq[T] { return [Normal|Break|Continue|...]() })
+	// =>
+	// Bind[T](*, [Normal|Break|Continue|...]())
+	bindCallWithDirectReturn := AndEx[CallExprPattern](m,
 		FuncCallee(m, pkgSeqPath, cstBind),
 		&ast.CallExpr{
 			Args: []ast.Expr{
 				Wildcard[ExprPattern](m),
 				&ast.FuncLit{
-					Body: &ast.BlockStmt{
-						List: []ast.Stmt{
-							&ast.ReturnStmt{
-								Results: []ast.Expr{
-									&ast.CallExpr{
-										Fun:  MkVar[ExprPattern](m, "fun"),
-										Args: []ast.Expr{},
-									},
-								},
+					Body: X.Block(
+						X.Return(
+							&ast.CallExpr{
+								Fun:  MkVar[ExprPattern](m, "fun"),
+								Args: []ast.Expr{},
 							},
-						},
-					},
+						),
+					),
 				},
 			},
 		},
 	)
 	m.Match(
-		bindCallWithReturnOnly,
+		bindCallWithDirectReturn,
 		func(m *Matcher, c *astutil.Cursor, stack []ast.Node, binds Binds) {
 			bindCall := c.Node()
 			bindCall.(*ast.CallExpr).Args[1] = binds["fun"].(ast.Expr)
@@ -172,18 +179,14 @@ func etaReduction(m *Matcher) {
 		Type: &ast.FuncType{
 			Params: MkVar[FieldListPattern](m, "params"),
 		},
-		Body: &ast.BlockStmt{
-			List: []ast.Stmt{
-				&ast.ReturnStmt{
-					Results: []ast.Expr{
-						&ast.CallExpr{
-							Fun:  MkVar[ExprPattern](m, "fun"),
-							Args: MkVar[ExprsPattern](m, "args"),
-						},
-					},
+		Body: X.Block(
+			X.Return(
+				&ast.CallExpr{
+					Fun:  MkVar[ExprPattern](m, "fun"),
+					Args: MkVar[ExprsPattern](m, "args"),
 				},
-			},
-		},
+			),
+		),
 	}
 
 	// assume type-checked
@@ -195,7 +198,7 @@ func etaReduction(m *Matcher) {
 		for _, argExpr := range argsExprs {
 			arg, _ := argExpr.(*ast.Ident)
 			if arg == nil {
-				return false
+				return false // must be ident
 			}
 			args = append(args, arg)
 		}
@@ -227,7 +230,6 @@ func etaReduction(m *Matcher) {
 	m.Match(
 		pattern,
 		func(m *Matcher, c *astutil.Cursor, stack []ast.Node, binds Binds) {
-			assert(!isNil(binds["params"]) && !isNil(binds["args"]))
 			params := binds["params"].(*ast.FieldList).List
 			args := binds["args"].(ExprsNode)
 			if matched(m, params, args) {
