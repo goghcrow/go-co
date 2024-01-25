@@ -1,7 +1,6 @@
 package rewriter
 
 import (
-	"flag"
 	"go/ast"
 	"go/types"
 	"strconv"
@@ -9,10 +8,8 @@ import (
 	"golang.org/x/tools/go/ast/astutil"
 )
 
-var underTestRun = flag.Lookup("test.v")
-
 func (r *yieldRewriter) gensym(prefix string) string {
-	if underTestRun == nil {
+	if runningWithGoTest {
 		return prefix
 	}
 	r.symCnt++

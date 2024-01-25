@@ -260,13 +260,7 @@ func Match[V comparable](rootA, rootB *Node[V], mode WalkMode, Walk func(*Node[V
 }
 
 func TestTreeWalker(t *testing.T) {
-	//       5
-	//      / \
-	//     3   7
-	//    / \   \
-	//   1   4   9
-	//          /
-	//         8
+
 	root := &Node[int]{
 		Val: 5,
 		Left: &Node[int]{
@@ -312,9 +306,7 @@ func TestTreeWalker(t *testing.T) {
 }
 
 func TestTreeMatcher(t *testing.T) {
-	//       1
-	//      / \
-	//     2   3
+
 	rootA := &Node[int]{
 		Val: 1,
 		Left: &Node[int]{
@@ -325,11 +317,6 @@ func TestTreeMatcher(t *testing.T) {
 		},
 	}
 
-	//       3
-	//      /
-	//     1
-	//    /
-	//   2
 	rootB := &Node[int]{
 		Val: 3,
 		Left: &Node[int]{

@@ -38,9 +38,7 @@ func (r *yieldRewriter) rewrite(c *astutil.Cursor) bool {
 			return true
 		}
 		if r.rewriter.isYieldFunc(typeof(n.Name)) {
-			// src := r.rewriter.ShowNode(n)
 			r.rewriteYieldFunc(n.Type, n.Body)
-			// X.AppendComment(&n.Doc, X.Comment(src))
 			c.Replace(n)
 		}
 		return true

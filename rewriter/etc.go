@@ -1,14 +1,20 @@
 package rewriter
 
 import (
+	"flag"
 	"go/ast"
 	"go/token"
 	"go/types"
+	"os"
 	"reflect"
 	"strings"
 
 	"golang.org/x/tools/go/types/typeutil"
 )
+
+// https://stackoverflow.com/questions/14249217/how-do-i-know-im-running-within-go-test
+var runningWithGoTest = flag.Lookup("test.v") != nil ||
+	strings.HasSuffix(os.Args[0], ".test")
 
 // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Ast Factory ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
 
@@ -200,14 +206,15 @@ func (factor) Stmt(n ast.Node) ast.Stmt {
 	}
 }
 
-func (factor) Comment(text string) *ast.Comment {
+func (factor) Comment(pos token.Pos, text string) *ast.Comment {
 	lines := strings.Split(text, "\n")
 	for i, line := range lines {
 		lines[i] = "// " + line
 	}
 	text = strings.Join(lines, "\n")
 	return &ast.Comment{
-		Text: text,
+		Slash: pos,
+		Text:  text,
 	}
 }
 

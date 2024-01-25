@@ -98,6 +98,7 @@ func rewrite(
 
 		// 1. parse import name
 		r.coImportedName, r.seqImportedName = parseOrImport(file)
+		r.comments = nil
 
 		// file level instance for file scope cache
 		rewriteYield := mkYieldRewriter(r)
@@ -107,6 +108,9 @@ func rewrite(
 		log.Printf("visit file: %s\n", r.Filename)
 		do := func(f astutil.ApplyFunc) { astutil.Apply(file, nil, f) }
 		// notice: order matters
+		if !runningWithGoTest {
+			do(r.attachComment) // attach the original source to comments
+		}
 		do(rewriteYieldFrom.rewrite) // rewrite yieldFrom() to range yield() (range co.Iter)
 		do(r.rewriteForRanges)       // rewrite range co.Iter to for loop co.Iter
 		do(r.rewriteInitStmt)        // extract out define in for-init/switch-init
@@ -115,6 +119,9 @@ func rewrite(
 
 		// 3. write file
 		log.Printf("write file: %s\n", r.Filename)
+		// clear free-floating comments, preventing confusing position of comments
+		// https://github.com/golang/go/issues/20744
+		r.File.Comments = r.comments
 		filename := strings.ReplaceAll(r.Filename, m.Cfg.Dir, outputDir)
 		r.WriteGeneratedFile(filename, pkgCoPath)
 	})
@@ -133,6 +140,7 @@ type rewriter struct {
 	// file context
 	coImportedName  string
 	seqImportedName string
+	comments        []*ast.CommentGroup
 }
 
 // Yield is stmt, not expr
@@ -190,6 +198,37 @@ func (r *rewriter) assert(ok bool, pos any, format string, a ...any) {
 		}
 		panic(fmt.Sprintf(format, a...) + " in: " + loc)
 	}
+}
+
+// ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Attach comment ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+
+func (r *rewriter) attachComment(c *astutil.Cursor) bool {
+	switch n := c.Node().(type) {
+	case *ast.FuncDecl:
+		if n.Body == nil {
+			return true
+		}
+		if r.isYieldFunc(r.TypeOf(n.Name)) {
+			// attach comment to func decl
+			src := r.ShowNode(n)
+			X.AppendComment(&n.Doc, X.Comment(n.Pos()-1, src))
+			c.Replace(n)
+		}
+		return true
+	case *ast.FuncLit:
+		if n.Body == nil {
+			return true
+		}
+		if r.isYieldFunc(r.TypeOf(n)) {
+			// attach comment to free-float
+			src := r.ShowNode(n)
+			r.comments = append(r.comments,
+				X.Comments(X.Comment(n.Pos()-1, src)))
+			c.Replace(n)
+		}
+		return true
+	}
+	return true
 }
 
 // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Rewrite ForInit ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
