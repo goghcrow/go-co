@@ -404,9 +404,7 @@ func TestCo(t *testing.T) {
 		t.Log(now() + " before async task")
 		Yield(SampleAsyncTask(42))
 
-		t.Log(now() + " after async task")
-
-		t.Log(now() + " get async task result")
+        t.Log(now() + " after async task and get result")
 		result, _ := s.GetReceive()
 		t.Log(result)
 
