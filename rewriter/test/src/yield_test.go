@@ -1,7 +1,6 @@
 package src
 
 import (
-	"reflect"
 	"testing"
 
 	. "github.com/goghcrow/go-co"
@@ -165,20 +164,6 @@ func TestDeepRecursive(t *testing.T) {
 	assertEqual(t, xs, []int{50000, 50001})
 }
 
-func TestXRange(t *testing.T) {
-	xrange := func(start, end, step int) (_ Iter[int]) {
-		for i := start; i <= end; i += step {
-			Yield(i)
-		}
-		return
-	}
-	var xs []int
-	for i := range xrange(10, 20, 2) {
-		xs = append(xs, i)
-	}
-	assertEqual(t, xs, []int{10, 12, 14, 16, 18, 20})
-}
-
 func TestYieldFromSameGen(t *testing.T) {
 	var gen func(int) Iter[int]
 	gen = func(a int) (_ Iter[int]) {
@@ -214,34 +199,4 @@ func TestYieldFromSameGen(t *testing.T) {
 	}
 	assertEqual(t, xs, []int{1, 4})
 	assertEqual(t, ys, []int{2, 3})
-}
-
-func TestFib(t *testing.T) {
-	fib := func() Iter[int] {
-		a, b := 1, 1
-		for {
-			Yield(b)
-			a, b = b, a+b
-		}
-	}
-	for n := range fib() {
-		if n > 1000 {
-			assertEqual(t, n, 1597)
-			break
-		}
-	}
-}
-
-func iter2slice[V any](g Iter[V]) []V {
-	var s []V
-	for i := range g {
-		s = append(s, i)
-	}
-	return s
-}
-func assertEqual(t *testing.T, a, b interface{}) {
-	if !reflect.DeepEqual(a, b) {
-		t.Logf("expect %+v got %+v", b, a)
-		t.FailNow()
-	}
 }

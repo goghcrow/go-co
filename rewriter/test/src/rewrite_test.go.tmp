@@ -6,26 +6,11 @@ import (
 	ʂɘʠ "github.com/goghcrow/go-co/seq"
 )
 
-func ignoreReturn() (_ ʂɘʠ.Iterator[int]) {
+func yield1() ʂɘʠ.Iterator[int] {
 	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		if true {
-			var a ʂɘʠ.Iterator[int]
-			_ = a
+		return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
 			return ʂɘʠ.Return[int]()
-
-		} else if true {
-			return ʂɘʠ.Return[int]()
-
-		} else {
-			return ʂɘʠ.Return[int]()
-
-		}
-	}))
-}
-
-func returnNil() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Return[int]()
+		})
 	}))
 
 }
@@ -43,30 +28,31 @@ func returnNilInFuncLit() ʂɘʠ.Iterator[int] {
 
 }
 
-func endlessLoop() ʂɘʠ.Iterator[int] {
+func ifYield1() ʂɘʠ.Iterator[int] {
 	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		for {
-		}
-	}))
-}
-
-func endlessLoopWithReturn() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		for {
-		}
-		return ʂɘʠ.Return[int]()
-	}))
-
-}
-
-func nestedEndlessLoopWithReturn() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		for {
-			for {
-
+		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+			if true {
+				return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.Normal[int]()
+				})
 			}
-		}
-		return ʂɘʠ.Return[int]()
+			return ʂɘʠ.Normal[int]()
+		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+			return ʂɘʠ.Return[int]()
+		}))
+	}))
+
+}
+
+func nestedForWith0() ʂɘʠ.Iterator[int] {
+	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+		return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+			return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+				return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.Normal[int]()
+				})
+			}))
+		}))
 	}))
 
 }
@@ -122,21 +108,28 @@ func nestedForIf() ʂɘʠ.Iterator[int] {
 
 }
 
-func endlessForWithReturn() ʂɘʠ.Iterator[int] {
+func endlessForWithYield() ʂɘʠ.Iterator[int] {
 	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		for {
-			return ʂɘʠ.Return[int]()
-
-		}
+		return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+			return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
+				return ʂɘʠ.Normal[int]()
+			})
+		}))
 	}))
+
 }
 
-func endlessForWithBreak() ʂɘʠ.Iterator[int] {
+func endlessForWithYield1() ʂɘʠ.Iterator[int] {
 	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		for {
-			break
-		}
-		return ʂɘʠ.Return[int]()
+		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+			return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+				return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.Normal[int]()
+				})
+			}))
+		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+			return ʂɘʠ.Return[int]()
+		}))
 	}))
 
 }
@@ -161,38 +154,6 @@ func endlessForWithYieldThenContinue() ʂɘʠ.Iterator[int] {
 		return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 			return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
 				return ʂɘʠ.Continue[int]()
-			})
-		}))
-	}))
-
-}
-
-func emptyBranchIfWithReturnNil() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		if true {
-
-		}
-		return ʂɘʠ.Return[int]()
-	}))
-
-}
-
-func returnNilBranchIf() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		if true {
-			return ʂɘʠ.Return[int]()
-
-		}
-		return ʂɘʠ.Return[int]()
-	}))
-
-}
-
-func endlessForWithYield() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		return ʂɘʠ.Loop[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-				return ʂɘʠ.Normal[int]()
 			})
 		}))
 	}))
@@ -379,25 +340,22 @@ func block011() ʂɘʠ.Iterator[int] {
 }
 
 func breakContinue() ʂɘʠ.Iterator[int] {
-	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		for {
-			func() ʂɘʠ.Iterator[int] {
-				return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-					return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
+	for {
+		func() ʂɘʠ.Iterator[int] {
+			return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+				return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
 
-						func() {
-							for {
-								break
-							}
-						}()
-						return ʂɘʠ.Return[int]()
-					})
-				}))
+					func() {
+						for {
+							break
+						}
+					}()
+					return ʂɘʠ.Return[int]()
+				})
+			}))
 
-			}()
-			continue
-		}
-		return ʂɘʠ.Return[int]()
-	}))
-
+		}()
+		continue
+	}
+	return nil
 }

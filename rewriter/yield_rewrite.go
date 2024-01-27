@@ -22,33 +22,25 @@ type yieldRewriter struct {
 	symCnt int // for unique symbol
 }
 
-func mkYieldRewriter(r *rewriter) *yieldRewriter {
-	return &yieldRewriter{
+func mkYieldRewriter(r *rewriter) func(c *astutil.Cursor) bool {
+	return (&yieldRewriter{
 		rewriter:        r,
 		rewriteRetCache: map[ast.Node]bool{},
-	}
+	}).rewrite
 }
 
 func (r *yieldRewriter) rewrite(c *astutil.Cursor) bool {
-	typeof := r.rewriter.TypeOf
-
-	switch n := c.Node().(type) {
+	switch f := c.Node().(type) {
 	case *ast.FuncDecl:
-		if n.Body == nil {
-			return true
-		}
-		if r.rewriter.isYieldFunc(typeof(n.Name)) {
-			r.rewriteYieldFunc(n.Type, n.Body)
-			c.Replace(n)
+		if r.rewriter.isYieldFuncDecl(f) {
+			r.rewriteYieldFunc(f.Type, f.Body)
+			c.Replace(f)
 		}
 		return true
 	case *ast.FuncLit:
-		if n.Body == nil {
-			return true
-		}
-		if r.rewriter.isYieldFunc(typeof(n)) {
-			r.rewriteYieldFunc(n.Type, n.Body)
-			c.Replace(n)
+		if r.rewriter.isYieldFuncLit(f) {
+			r.rewriteYieldFunc(f.Type, f.Body)
+			c.Replace(f)
 		}
 		return true
 	}
@@ -84,7 +76,7 @@ func (r *yieldRewriter) rewriteYieldFuncResult() {
 // >>> return Start(Delay[T](func() Seq[T] { ... }))
 func (r *yieldRewriter) rewriteYieldFuncBody() {
 	// pass0
-	// rewrite `return` or `return nil` to return seq.Return() in yield func
+	// 1. rewrite `return` or `return nil` to return seq.Return() in yield func
 	//
 	// in the old implementation, we replace the trival block body of
 	// "ifStmt / forStmt / blockStmt..." to the rewritten version (pass2)
@@ -99,7 +91,27 @@ func (r *yieldRewriter) rewriteYieldFuncBody() {
 	//
 	// and why rewriting ReturnStmt firstly?
 	// cause of easy to recognize yield func before any rewriting
-	r.rewriteReturn(r.funcBody)
+	//
+	// 2. extract out define in for-init/switch-init in yield func
+	//
+	// keep shadow semantics by adding extra block,
+	// prevent name conflict name in the scope after rewriteYield
+	// e.g.,
+	//
+	//	i := 0; for i := 0; ; { ... }
+	//	=>
+	//	i := 0; i := 0; for ; ; { ... }
+	//	=>
+	//	i := 0; { i := 0; for ; ; { ... } }
+	//
+	//	for $init; ; { ... }
+	//	=>
+	//	{
+	//		$init
+	//		for ; ; { ... }
+	//	}
+
+	r.rewriteReturnAndForSwitchInitStmtInYieldFun(r.funcBody)
 
 	// pass1
 	r.rewriteRanges(r.funcBody)
@@ -570,7 +582,7 @@ func (r *yieldRewriter) combineIfNecessary(children *block) *block {
 	return following
 }
 
-func (r *yieldRewriter) rewriteReturn(body *ast.BlockStmt) {
+func (r *yieldRewriter) rewriteReturnAndForSwitchInitStmtInYieldFun(body *ast.BlockStmt) {
 	var (
 		yieldFunStack = mkStack[bool](true) // default in yield func
 		enter         = yieldFunStack.push
@@ -578,7 +590,6 @@ func (r *yieldRewriter) rewriteReturn(body *ast.BlockStmt) {
 		inYieldFunc   = yieldFunStack.top
 
 		typeof   = r.rewriter.TypeOf
-		isYield  = r.rewriter.isYieldFunc
 		isRetNil = func(ret *ast.ReturnStmt) bool {
 			if ret.Results == nil {
 				return true
@@ -592,25 +603,26 @@ func (r *yieldRewriter) rewriteReturn(body *ast.BlockStmt) {
 	)
 
 	astutil.Apply(body, func(c *astutil.Cursor) bool {
-		switch n := c.Node().(type) {
+		switch f := c.Node().(type) {
 		case *ast.FuncDecl:
-			if r.rewriteRetCache[n] {
+			if r.rewriteRetCache[f] {
 				return false
 			}
-			r.rewriteRetCache[n] = true
-			enter(isYield(typeof(n.Name)))
+			r.rewriteRetCache[f] = true
+			enter(r.rewriter.isYieldFuncDecl(f))
 		case *ast.FuncLit:
-			if r.rewriteRetCache[n] {
+			if r.rewriteRetCache[f] {
 				return false
 			}
-			r.rewriteRetCache[n] = true
-			enter(isYield(typeof(n)))
+			r.rewriteRetCache[f] = true
+			enter(r.rewriter.isYieldFuncLit(f))
 		}
 		return true
 	}, func(c *astutil.Cursor) bool {
 		switch n := c.Node().(type) {
 		case *ast.FuncDecl, *ast.FuncLit:
 			exit()
+
 		case *ast.ReturnStmt:
 			if n.Return == token.NoPos {
 				return true // skip generated node
@@ -624,6 +636,29 @@ func (r *yieldRewriter) rewriteReturn(body *ast.BlockStmt) {
 				}
 				c.Replace(X.Return(r.CallReturn()))
 			}
+
+		case *ast.ForStmt:
+			if inYieldFunc() && isDefineStmt(n.Init) {
+				init := n.Init
+				n.Init = nil
+				n.For = token.NoPos
+				c.Replace(X.Block(init, n))
+			}
+		case *ast.SwitchStmt:
+			if inYieldFunc() && isDefineStmt(n.Init) {
+				init := n.Init
+				n.Init = nil
+				n.Switch = token.NoPos
+				c.Replace(X.Block(init, n))
+			}
+		case *ast.TypeSwitchStmt:
+			if inYieldFunc() && isDefineStmt(n.Init) {
+				init := n.Init
+				n.Init = nil
+				n.Switch = token.NoPos
+				c.Replace(X.Block(init, n))
+			}
+
 		}
 		return true
 	})

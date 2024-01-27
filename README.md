@@ -1,4 +1,6 @@
-## What is go-co
+# What is go-co
+
+> **The Old New Thing**
 
 go-co(routine) is a **Source to Source Compiler** which rewrites trival yield expression to monadic style code.
 
@@ -52,10 +54,117 @@ func main() {
 }
 ```
 
+
 ## Example
 
+### Sample
+
+```golang
+package sample
+
+import (
+	"strings"
+	
+	. "github.com/goghcrow/go-co"
+)
+
+func SampleGetNumList() (_ Iter[int]) {
+	Yield(1)
+	Yield(2)
+	Yield(3)
+	return
+}
+
+func SampleYieldFrom() (_ Iter[int]) {
+	Yield(0)
+	YieldFrom(SampleForYield())
+	Yield(4)
+	return
+}
+
+func SampleForYield() (_ Iter[int]) {
+	for i := 0; i < 5; i++ {
+		Yield(i)
+	}
+	return
+}
+
+func SampleGetEvenNumbers(start, end int) (_ Iter[int]) {
+	for i := start; i < end; i++ {
+		if i%2 == 0 {
+			Yield(i)
+		}
+	}
+	return
+}
+
+func PowersOfTwo(exponent int) (_ Iter[int]) {
+	for r, i := 1, 0; i < exponent; i++ {
+		Yield(r)
+		r *= 2
+	}
+	return
+}
+
+func Fibonacci() Iter[int] {
+	a, b := 1, 1
+	for {
+		Yield(b)
+		a, b = b, a+b
+	}
+}
+
+func Range(start, end, step int) (_ Iter[int]) {
+	for i := start; i <= end; i += step {
+		Yield(i)
+	}
+	return
+}
+
+func Grep(s string, lines []string) (_ Iter[string]) {
+	for _, line := range lines {
+		if strings.Contains(line, s) {
+			Yield(line)
+		}
+	}
+	return
+}
+
+func Run() {
+	// PUSH MODE
+	for n := range SampleGetNumList() {
+		println(n)
+	}
+
+	for n := range SampleYieldFrom() {
+		println(n)
+	}
+
+	for n := range Fibonacci() {
+		if n > 1000 {
+			Yield(n)
+			break
+		}
+	}
+
+	for i := range Range(0, 100, 2) {
+		println(i)
+	}
+
+	// or Pull Mode
+
+	iter := Range(0, 100, 2)
+	for iter.MoveNext() {
+		println(iter.Current())
+	}
+}
+
+```
+
+### Tree Walker
+
 ````golang
-package src
+package sample
 
 import (
 	"testing"
@@ -77,25 +186,26 @@ const (
 )
 
 func Walk[V any](n *Node[V], mode WalkMode) (_ Iter[V]) {
-	if n == nil {
-		return
-	}
-	if mode == PreOrder {
-		Yield(n.Val)
-		YieldFrom(Walk(n.Left, mode))
-		YieldFrom(Walk(n.Right, mode))
-	} else if mode == InOrder {
-		YieldFrom(Walk(n.Left, mode))
-		Yield(n.Val)
-		YieldFrom(Walk(n.Right, mode))
-	} else if mode == PostOrder {
-		YieldFrom(Walk(n.Left, mode))
-		YieldFrom(Walk(n.Right, mode))
-		Yield(n.Val)
-	} else {
-		panic("unknown walk mode")
-	}
-	return
+  if n == nil {
+    return
+  }
+  switch mode {
+  case PreOrder:
+    Yield(n.Val)
+    YieldFrom(Walk(n.Left, mode))
+    YieldFrom(Walk(n.Right, mode))
+  case InOrder:
+    YieldFrom(Walk(n.Left, mode))
+    Yield(n.Val)
+    YieldFrom(Walk(n.Right, mode))
+  case PostOrder:
+    YieldFrom(Walk(n.Left, mode))
+    YieldFrom(Walk(n.Right, mode))
+    Yield(n.Val)
+  default:
+    panic("unknown walk mode")
+  }
+  return
 }
 
 // Match the same iterating path
@@ -197,3 +307,127 @@ func TestTreeMatcher(t *testing.T) {
 	assertEqual(t, Match(rootA, rootB, PostOrder), false)
 }
 ````
+
+### Coroutine Scheduler
+
+```golang
+package sample
+
+import (
+	"sync"
+	"testing"
+	"time"
+
+	. "github.com/goghcrow/go-co"
+)
+
+var wg = &sync.WaitGroup{}
+
+type Sched struct {
+	val any
+	err error
+}
+
+func (s *Sched) run(co func(s *Sched) Iter[Async]) {
+	it := co(s)
+
+	var run func()
+	run = func() {
+		for it.MoveNext() {
+			switch v := it.Current().(type) {
+			case Async:
+				v.Begin(func(v any, err error) {
+					s.send(v, err)
+					run()
+				})
+				return
+			default:
+				panic("unreached")
+			}
+		}
+		wg.Done()
+	}
+
+	wg.Add(1)
+	run()
+}
+
+func (s *Sched) send(v any, err error) {
+	s.val = v
+	s.err = err
+}
+
+func (s *Sched) GetReceive() (any, error) {
+	return s.val, s.err
+}
+
+func Co(co func(s *Sched) Iter[Async]) {
+	sched := &Sched{}
+	sched.run(co)
+}
+
+type Async interface {
+	Begin(cont func(v any, err error))
+}
+
+type AsyncFun func(cont func(v any, err error))
+
+func (f AsyncFun) Begin(cont func(v any, err error)) {
+	f(cont)
+}
+
+// ------------------------------------------------------------
+
+func Sleep(d time.Duration) Async {
+	return AsyncFun(func(cont func(v any, err error)) {
+		timeAfter(d, func() {
+			cont(nil, nil)
+		})
+	})
+}
+
+func SampleAsyncTask(v any) Async {
+	return AsyncFun(func(cont func(v any, err error)) {
+		timeAfter(time.Second, func() {
+			cont(v, nil)
+		})
+	})
+}
+
+func TestCo(t *testing.T) {
+	Co(func(s *Sched) (_ Iter[Async]) {
+		t.Log("start")
+
+		t.Log(now() + " before sleep")
+		Yield(Sleep(time.Second * 1))
+
+		t.Log(now() + " before async task")
+		Yield(SampleAsyncTask(42))
+
+		t.Log(now() + " after async task")
+
+		t.Log(now() + " get async task result")
+		result, _ := s.GetReceive()
+		t.Log(result)
+
+		t.Log("end")
+		return
+	})
+
+	wg.Wait()
+}
+
+// ------------------------------------------------------------
+
+// fake callback
+func timeAfter(d time.Duration, cb func()) {
+	go func() {
+		time.Sleep(d)
+		cb()
+	}()
+}
+
+func now() string {
+	return time.Now().Format("2006-01-02 15:04:05")
+}
+```

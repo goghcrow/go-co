@@ -168,7 +168,7 @@ func TestFor(t *testing.T) {
 			}
 		}
 
-		g := func() Iter[int] {
+		g := func() {
 			flag := true
 			for ; flag; f(func() Iter[int] {
 				Yield(1)
@@ -178,9 +178,8 @@ func TestFor(t *testing.T) {
 			}()) {
 				flag = false
 			}
-			return nil
 		}
-		iter2slice(g())
+		g()
 		assertEqual(t, xs, []int{1, 2, 3})
 
 	}

@@ -96,26 +96,25 @@ func rewrite(
 			return
 		}
 
-		// 1. parse import name
-		r.coImportedName, r.seqImportedName = parseOrImport(file)
+		// 1. init file context
+		r.coImportedName, r.seqImportedName = parseOrImport(file) // parse import name
 		r.comments = nil
 
-		// file level instance for file scope cache
-		rewriteYield := mkYieldRewriter(r)
-		rewriteYieldFrom := mkYieldFromRewriter(r)
+		r.yieldFuncDecls = map[*ast.FuncDecl]bool{}
+		r.yieldFuncLits = map[*ast.FuncLit]bool{}
+		r.collectYieldFunc(file) // collect func with yield/yieldFrom call
 
 		// 2. rewrite file
 		log.Printf("visit file: %s\n", r.Filename)
 		do := func(f astutil.ApplyFunc) { astutil.Apply(file, nil, f) }
+
+		// file level instance for file scope cache
 		// notice: order matters
-		if !runningWithGoTest {
-			do(r.attachComment) // attach the original source to comments
-		}
-		do(rewriteYieldFrom.rewrite) // rewrite yieldFrom() to range yield() (range co.Iter)
-		do(r.rewriteForRanges)       // rewrite range co.Iter to for loop co.Iter
-		do(r.rewriteInitStmt)        // extract out define in for-init/switch-init
-		do(rewriteYield.rewrite)     // rewrite yield func
-		do(r.rewriteIter)            // rewrite all co.Iter to seq.Iterator
+		do(r.attachComment)        // attach the original source to comments
+		do(mkYieldFromRewriter(r)) // rewrite yieldFrom() to range yield() (range co.Iter)
+		do(r.rewriteForRanges)     // rewrite range co.Iter to for loop co.Iter
+		do(mkYieldRewriter(r))     // rewrite yield func
+		do(r.rewriteIter)          // rewrite all co.Iter to seq.Iterator
 
 		// 3. write file
 		log.Printf("write file: %s\n", r.Filename)
@@ -140,6 +139,8 @@ type rewriter struct {
 	// file context
 	coImportedName  string
 	seqImportedName string
+	yieldFuncDecls  map[*ast.FuncDecl]bool
+	yieldFuncLits   map[*ast.FuncLit]bool
 	comments        []*ast.CommentGroup
 }
 
@@ -154,22 +155,12 @@ func (r *rewriter) isYieldFromCall(n ast.Node) (*ast.CallExpr, bool) {
 	return isCallStmtOf(r.Info, n, r.yieldFromFunc)
 }
 
-// isGenerator
-func (r *rewriter) isYieldFunc(funTy types.Type) bool {
-	sig, ok := funTy.(*types.Signature)
-	if !ok {
-		return false
-	}
+func (r *rewriter) isYieldFuncDecl(f *ast.FuncDecl) bool {
+	return r.yieldFuncDecls[f]
+}
 
-	rs := sig.Results()
-
-	singleRet := rs != nil && rs.Len() == 1
-	if !singleRet {
-		return false
-	}
-
-	retTy := rs.At(0).Type()
-	return r.isIterator(retTy)
+func (r *rewriter) isYieldFuncLit(f *ast.FuncLit) bool {
+	return r.yieldFuncLits[f]
 }
 
 func (r *rewriter) yieldFuncRetParamTy(f *ast.FuncType) ast.Expr {
@@ -200,31 +191,94 @@ func (r *rewriter) assert(ok bool, pos any, format string, a ...any) {
 	}
 }
 
+// ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Collect YieldFunc ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+
+// collect funs which containing yield / yieldFrom called directly by reference,
+// make sure funcDecl | funcLit modified in place afterward
+func (r *rewriter) collectYieldFunc(file *ast.File) {
+	var (
+		yieldFunStack = mkStack[ast.Node /*FuncDecl|FuncLit*/](nil)
+		enter         = yieldFunStack.push
+		exit          = yieldFunStack.pop
+		outer         = yieldFunStack.top
+	)
+
+	checkSignature := func(funTy types.Type, pos token.Pos) {
+		msg := "invalid yield func signature, expect one co.Iter[T] return"
+
+		sig, ok := funTy.(*types.Signature)
+		r.assert(ok, pos, msg)
+		rs := sig.Results()
+
+		singleRet := rs != nil && rs.Len() == 1
+		r.assert(singleRet, pos, msg)
+
+		retTy := rs.At(0).Type()
+		retIter := r.isIterator(retTy)
+		r.assert(retIter, pos, msg)
+	}
+
+	cache := map[ast.Node]bool{}
+	astutil.Apply(file, func(c *astutil.Cursor) bool {
+		switch f := c.Node().(type) {
+		case *ast.FuncDecl:
+			if cache[f] {
+				return false
+			}
+			cache[f] = true
+			enter(f)
+		case *ast.FuncLit:
+			if cache[f] {
+				return false
+			}
+			cache[f] = true
+			enter(f)
+		}
+		return true
+	}, func(c *astutil.Cursor) bool {
+		switch n := c.Node().(type) {
+		case *ast.FuncDecl, *ast.FuncLit:
+			exit()
+
+		case *ast.CallExpr:
+			callee := r.ObjectOfCall(n)
+			if callee == r.yieldFunc || callee == r.yieldFromFunc {
+				switch f := outer().(type) {
+				case *ast.FuncDecl:
+					checkSignature(r.TypeOf(f.Name), n.Pos())
+					r.yieldFuncDecls[f] = true
+				case *ast.FuncLit:
+					checkSignature(r.TypeOf(f), n.Pos())
+					r.yieldFuncLits[f] = true
+				}
+			}
+		}
+		return true
+	})
+}
+
 // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Attach comment ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
 
 func (r *rewriter) attachComment(c *astutil.Cursor) bool {
-	switch n := c.Node().(type) {
+	if runningWithGoTest {
+		return true
+	}
+	switch f := c.Node().(type) {
 	case *ast.FuncDecl:
-		if n.Body == nil {
-			return true
-		}
-		if r.isYieldFunc(r.TypeOf(n.Name)) {
+		if r.isYieldFuncDecl(f) {
 			// attach comment to func decl
-			src := r.ShowNode(n)
-			X.AppendComment(&n.Doc, X.Comment(n.Pos()-1, src))
-			c.Replace(n)
+			src := r.ShowNode(f)
+			X.AppendComment(&f.Doc, X.Comment(f.Pos()-1, src))
+			c.Replace(f)
 		}
 		return true
 	case *ast.FuncLit:
-		if n.Body == nil {
-			return true
-		}
-		if r.isYieldFunc(r.TypeOf(n)) {
+		if r.isYieldFuncLit(f) {
 			// attach comment to free-float
-			src := r.ShowNode(n)
+			src := r.ShowNode(f)
 			r.comments = append(r.comments,
-				X.Comments(X.Comment(n.Pos()-1, src)))
-			c.Replace(n)
+				X.Comments(X.Comment(f.Pos()-1, src)))
+			c.Replace(f)
 		}
 		return true
 	}

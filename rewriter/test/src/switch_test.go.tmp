@@ -10,44 +10,50 @@ import (
 
 func trivalSwitch() (_ ʂɘʠ.Iterator[int]) {
 	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-		{
-			a := 1
-			switch a {
-			case 1:
-				return ʂɘʠ.Return[int]()
+		return ʂɘʠ.Bind[int](0, func() ʂɘʠ.Seq[int] {
+			{
 
-			case 2:
-				return ʂɘʠ.Return[int]()
+				a := 1
+				switch a {
+				case 1:
+					return ʂɘʠ.Return[int]()
 
-			default:
-				return ʂɘʠ.Return[int]()
+				case 2:
+					return ʂɘʠ.Return[int]()
 
+				default:
+					return ʂɘʠ.Return[int]()
+
+				}
 			}
-		}
+		})
 	}))
 }
 
 func TestSwitchInitNameConflict(t *testing.T) {
 	g := func() (_ ʂɘʠ.Iterator[int]) {
 		return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-			a := 42
-			{
-				a := a + 1
-				switch a {
-				case 1:
-					assertEqual(t, a, 43)
-					return ʂɘʠ.Return[int]()
+			return ʂɘʠ.Bind[int](0, func() ʂɘʠ.Seq[int] {
 
-				case 2:
-					assertEqual(t, a, 43)
-					return ʂɘʠ.Return[int]()
+				a := 42
+				{
+					a := a + 1
+					switch a {
+					case 1:
+						assertEqual(t, a, 43)
+						return ʂɘʠ.Return[int]()
 
-				default:
-					assertEqual(t, a, 43)
-					return ʂɘʠ.Return[int]()
+					case 2:
+						assertEqual(t, a, 43)
+						return ʂɘʠ.Return[int]()
 
+					default:
+						assertEqual(t, a, 43)
+						return ʂɘʠ.Return[int]()
+
+					}
 				}
-			}
+			})
 		}))
 	}
 	iter2slice(g())

@@ -4,18 +4,8 @@ import (
 	. "github.com/goghcrow/go-co"
 )
 
-func ignoreReturn() (_ Iter[int]) {
-	if true {
-		var a Iter[int]
-		return a
-	} else if true {
-		return nil
-	} else {
-		return
-	}
-}
-
-func returnNil() Iter[int] {
+func yield1() Iter[int] {
+	Yield(1)
 	return nil
 }
 
@@ -28,24 +18,19 @@ func returnNilInFuncLit() Iter[int] {
 	return nil
 }
 
-func endlessLoop() Iter[int] {
-	for {
-	}
-}
-
-func endlessLoopWithReturn() Iter[int] {
-	for {
+func ifYield1() Iter[int] {
+	if true {
+		Yield(1)
 	}
 	return nil
 }
 
-func nestedEndlessLoopWithReturn() Iter[int] {
+func nestedForWith0() Iter[int] {
 	for {
 		for {
-
+			Yield(1)
 		}
 	}
-	return nil
 }
 
 func nestedForWith() Iter[int] {
@@ -70,15 +55,15 @@ func nestedForIf() Iter[int] {
 	return nil
 }
 
-func endlessForWithReturn() Iter[int] {
+func endlessForWithYield() Iter[int] {
 	for {
-		return nil
+		Yield(1)
 	}
 }
 
-func endlessForWithBreak() Iter[int] {
+func endlessForWithYield1() Iter[int] {
 	for {
-		break
+		Yield(1)
 	}
 	return nil
 }
@@ -95,26 +80,6 @@ func endlessForWithYieldThenContinue() Iter[int] {
 	for {
 		Yield(1)
 		continue
-	}
-}
-
-func emptyBranchIfWithReturnNil() Iter[int] {
-	if true {
-
-	}
-	return nil
-}
-
-func returnNilBranchIf() Iter[int] {
-	if true {
-		return nil
-	}
-	return nil
-}
-
-func endlessForWithYield() Iter[int] {
-	for {
-		Yield(1)
 	}
 }
 

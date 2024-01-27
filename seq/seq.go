@@ -92,6 +92,10 @@ func For[V any](
 	}
 }
 
+// func For1[V any](cond func() bool, post, body Seq[V]) Seq[V] {
+// 	return For(cond, nil, Combine(body, post))
+// }
+
 func While[V any](cond func() bool, body Seq[V]) Seq[V] {
 	return For(cond, nil, body)
 }

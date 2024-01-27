@@ -7,6 +7,7 @@ import (
 )
 
 func trivalSwitch() (_ Iter[int]) {
+	Yield(0)
 	switch a := 1; a {
 	case 1:
 		return
@@ -19,6 +20,7 @@ func trivalSwitch() (_ Iter[int]) {
 
 func TestSwitchInitNameConflict(t *testing.T) {
 	g := func() (_ Iter[int]) {
+		Yield(0)
 		a := 42
 		switch a := a + 1; a {
 		case 1:

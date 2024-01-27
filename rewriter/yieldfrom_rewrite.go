@@ -12,8 +12,8 @@ type yieldFromRewriter struct {
 	rewriter *rewriter
 }
 
-func mkYieldFromRewriter(r *rewriter) *yieldFromRewriter {
-	return &yieldFromRewriter{rewriter: r}
+func mkYieldFromRewriter(r *rewriter) func(c *astutil.Cursor) bool {
+	return (&yieldFromRewriter{rewriter: r}).rewrite
 }
 
 func (r *yieldFromRewriter) rewrite(c *astutil.Cursor) bool {

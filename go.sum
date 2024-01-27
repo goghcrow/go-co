@@ -1,6 +1,4 @@
 github.com/goghcrow/go-ansi v1.0.0 h1:wrtmgoHPJeIVxnTxY+rJ47yZXqxFYcuFFAZ67GBNMec=
-github.com/goghcrow/go-ast-matcher v0.0.12 h1:tSrRprKFQWuAdlqUoSfum+w7O8QFHQjs06kiE95iEwo=
-github.com/goghcrow/go-ast-matcher v0.0.12/go.mod h1:ETBvhixLHIMi4orU0A0Bt5I1p3H5y5tg5hiAtSPnuKQ=
 github.com/goghcrow/go-ast-matcher v0.0.13-0.20240122164752-8b23ddb7d0dc h1:801gohzlQIC8NzOyXneYo3n6z+lhiXFIPJJYM2aHDWY=
 github.com/goghcrow/go-ast-matcher v0.0.13-0.20240122164752-8b23ddb7d0dc/go.mod h1:ETBvhixLHIMi4orU0A0Bt5I1p3H5y5tg5hiAtSPnuKQ=
 golang.org/x/mod v0.14.0 h1:dGoOF9QVLYng8IHTm7BAyWqCqSheQ5pYWGhzW00YJr0=

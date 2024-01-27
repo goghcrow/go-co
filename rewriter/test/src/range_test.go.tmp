@@ -472,11 +472,8 @@ func TestRangeMap(t *testing.T) {
 func TestRangeChan(t *testing.T) {
 	mkCh := func(len int) <-chan int {
 		xs := make(chan int, len)
-		{
-			i := 0
-			for ; i < len; i++ {
-				xs <- i
-			}
+		for i := 0; i < len; i++ {
+			xs <- i
 		}
 		close(xs)
 		return xs

@@ -318,38 +318,31 @@ func TestFor(t *testing.T) {
 	{
 		var xs []int
 		f := func(g ʂɘʠ.Iterator[int]) {
-			{
-				ɪʇ := g
-				for ɪʇ.MoveNext() {
-					i := ɪʇ.Current()
-					xs = append(xs, i)
-				}
+			for ɪʇ := g; ɪʇ.MoveNext(); {
+				i := ɪʇ.Current()
+				xs = append(xs, i)
 			}
 
 		}
 
-		g := func() ʂɘʠ.Iterator[int] {
-			return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-				flag := true
-				for ; flag; f(func() ʂɘʠ.Iterator[int] {
-					return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-						return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
-							return ʂɘʠ.Bind[int](2, func() ʂɘʠ.Seq[int] {
-								return ʂɘʠ.Bind[int](3, func() ʂɘʠ.Seq[int] {
-									return ʂɘʠ.Return[int]()
-								})
+		g := func() {
+			flag := true
+			for ; flag; f(func() ʂɘʠ.Iterator[int] {
+				return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.Bind[int](1, func() ʂɘʠ.Seq[int] {
+						return ʂɘʠ.Bind[int](2, func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Bind[int](3, func() ʂɘʠ.Seq[int] {
+								return ʂɘʠ.Return[int]()
 							})
 						})
-					}))
+					})
+				}))
 
-				}()) {
-					flag = false
-				}
-				return ʂɘʠ.Return[int]()
-			}))
-
+			}()) {
+				flag = false
+			}
 		}
-		iter2slice(g())
+		g()
 		assertEqual(t, xs, []int{1, 2, 3})
 
 	}
