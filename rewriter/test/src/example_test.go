@@ -42,13 +42,15 @@ func SampleLoop() (_ Iter[any]) {
 	for i, c := range "Hello World!" {
 		Yield(Pair[int, rune]{i, c})
 	}
+	return
+}
 
+func SampleLoopMap() (_ Iter[Pair[string, int]]) {
 	m := map[string]int{"a": 1, "b": 2, "c": 3}
 	for k, v := range m {
 		Yield(Pair[string, int]{k, v})
 	}
-
-	return
+	return nil
 }
 
 func SampleGetEvenNumbers(start, end int) (_ Iter[int]) {
@@ -149,6 +151,18 @@ func ReadFile(name string) (_ Iter[Line]) {
 	return
 }
 
+func TestSampleMap(t *testing.T) {
+	it := SampleLoopMap()
+	m := map[string]int{}
+	for it.MoveNext() {
+		m[it.Current().Key] = it.Current().Val
+	}
+	assertEqual(t, len(m), 3)
+	assertEqual(t, m["a"], 1)
+	assertEqual(t, m["b"], 2)
+	assertEqual(t, m["c"], 3)
+}
+
 func TestSample(t *testing.T) {
 	all := []struct {
 		name    string
@@ -185,9 +199,6 @@ func TestSample(t *testing.T) {
 				Pair[int, rune]{9, 'l'},
 				Pair[int, rune]{10, 'd'},
 				Pair[int, rune]{11, '!'},
-				Pair[string, int]{"a", 1},
-				Pair[string, int]{"b", 2},
-				Pair[string, int]{"c", 3},
 			},
 		},
 		{

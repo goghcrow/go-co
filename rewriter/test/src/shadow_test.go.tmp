@@ -2,11 +2,13 @@
 package src
 
 import (
+	"testing"
+
 	. "github.com/goghcrow/go-co"
 	ʂɘʠ "github.com/goghcrow/go-co/seq"
 )
 
-func shadow0() ʂɘʠ.Iterator[int] {
+func forInit() ʂɘʠ.Iterator[int] {
 	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 		i := 0
 		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
@@ -14,27 +16,28 @@ func shadow0() ʂɘʠ.Iterator[int] {
 
 				i := 0
 				return ʂɘʠ.For[int](func() bool {
-					return i < 2
+					return i < 3
 				}, func() {
 					i++
 				}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+
+					i := i + 1
 					return ʂɘʠ.Bind[int](i, func() ʂɘʠ.Seq[int] {
 						return ʂɘʠ.Normal[int]()
 					})
 				}))
 			})
 		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-
-			i++
-			println(i)
-			return ʂɘʠ.Return[int]()
+			return ʂɘʠ.Bind[int](i, func() ʂɘʠ.Seq[int] {
+				return ʂɘʠ.Return[int]()
+			})
 		}))
 	}))
 
 }
 
 // ↑ is equivalent to ↓
-func shadow1() ʂɘʠ.Iterator[int] {
+func forInit1() ʂɘʠ.Iterator[int] {
 	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 		i := 0
 		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
@@ -42,21 +45,86 @@ func shadow1() ʂɘʠ.Iterator[int] {
 
 				i := 0
 				return ʂɘʠ.For[int](func() bool {
-					return i < 2
+					return i < 3
 				}, func() {
 					i++
 				}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+
+					i := i + 1
 					return ʂɘʠ.Bind[int](i, func() ʂɘʠ.Seq[int] {
 						return ʂɘʠ.Normal[int]()
 					})
 				}))
 			})
 		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
-
-			i++
-			println(i)
-			return ʂɘʠ.Return[int]()
+			return ʂɘʠ.Bind[int](i, func() ʂɘʠ.Seq[int] {
+				return ʂɘʠ.Return[int]()
+			})
 		}))
 	}))
 
+}
+
+func rangeInit() ʂɘʠ.Iterator[int] {
+	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+		i := 0
+		ɪʇ := ʂɘʠ.NewSliceIter([]int{0, 1, 2})
+		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+			return ʂɘʠ.While[int](func() bool {
+				return ɪʇ.MoveNext()
+			}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+
+				i := ɪʇ.Current().Val
+				return ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+
+					i := i + 1
+					return ʂɘʠ.Bind[int](i, func() ʂɘʠ.Seq[int] {
+						return ʂɘʠ.Normal[int]()
+					})
+				})
+			}))
+		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+			return ʂɘʠ.Bind[int](i, func() ʂɘʠ.Seq[int] {
+				return ʂɘʠ.Return[int]()
+			})
+		}))
+	}))
+
+}
+
+// ↑ is equivalent to ↓
+func rangeInit1() ʂɘʠ.Iterator[int] {
+	return ʂɘʠ.Start[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+		i := 0
+		ɪʇ := ʂɘʠ.NewSliceIter([]int{0, 1, 2})
+		return ʂɘʠ.Combine[int](ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+			return ʂɘʠ.While[int](func() bool {
+				return ɪʇ.MoveNext()
+			}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+
+				i := ɪʇ.Current().Val
+				return ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+					return ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+
+						i := i + 1
+						return ʂɘʠ.Bind[int](i, func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Normal[int]()
+						})
+					})
+				})
+			}))
+		}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+			return ʂɘʠ.Bind[int](i, func() ʂɘʠ.Seq[int] {
+				return ʂɘʠ.Return[int]()
+			})
+		}))
+	}))
+
+}
+
+func TestShadow(t *testing.T) {
+	assertEqual(t, iter2slice(forInit()), []int{1, 2, 3, 0})
+	assertEqual(t, iter2slice(forInit1()), []int{1, 2, 3, 0})
+	assertEqual(t, iter2slice(rangeInit()), []int{1, 2, 3, 0})
+	assertEqual(t, iter2slice(rangeInit1()), []int{1, 2, 3, 0})
 }
