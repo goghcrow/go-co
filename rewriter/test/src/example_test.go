@@ -24,10 +24,30 @@ func SampleYieldFrom() (_ Iter[int]) {
 	return
 }
 
-func SampleForYield() (_ Iter[int]) {
+type Pair[K, V any] struct {
+	Key K
+	Val V
+}
+
+func SampleLoop() (_ Iter[any]) {
 	for i := 0; i < 5; i++ {
 		Yield(i)
 	}
+
+	xs := []string{"a", "b", "c"}
+	for i, n := range xs {
+		Yield(Pair[int, string]{i, n})
+	}
+
+	for i, c := range "Hello World!" {
+		Yield(Pair[int, rune]{i, c})
+	}
+
+	m := map[string]int{"a": 1, "b": 2, "c": 3}
+	for k, v := range m {
+		Yield(Pair[string, int]{k, v})
+	}
+
 	return
 }
 
@@ -132,8 +152,8 @@ func ReadFile(name string) (_ Iter[Line]) {
 func TestSample(t *testing.T) {
 	all := []struct {
 		name    string
-		factory func() Iter[int]
-		expect  []int
+		factory any
+		expect  any
 	}{
 		{
 			name:    "SampleGetNumList",
@@ -146,9 +166,29 @@ func TestSample(t *testing.T) {
 			expect:  []int{0, 1, 2, 3, 4},
 		},
 		{
-			name:    "SampleForYield",
-			factory: SampleForYield,
-			expect:  []int{0, 1, 2, 3, 4},
+			name:    "SampleLoop",
+			factory: SampleLoop,
+			expect: []any{
+				0, 1, 2, 3, 4,
+				Pair[int, string]{0, "a"},
+				Pair[int, string]{1, "b"},
+				Pair[int, string]{2, "c"},
+				Pair[int, rune]{0, 'H'},
+				Pair[int, rune]{1, 'e'},
+				Pair[int, rune]{2, 'l'},
+				Pair[int, rune]{3, 'l'},
+				Pair[int, rune]{4, 'o'},
+				Pair[int, rune]{5, ' '},
+				Pair[int, rune]{6, 'W'},
+				Pair[int, rune]{7, 'o'},
+				Pair[int, rune]{8, 'r'},
+				Pair[int, rune]{9, 'l'},
+				Pair[int, rune]{10, 'd'},
+				Pair[int, rune]{11, '!'},
+				Pair[string, int]{"a", 1},
+				Pair[string, int]{"b", 2},
+				Pair[string, int]{"c", 3},
+			},
 		},
 		{
 			name: "SampleGetEvenNumbers",
@@ -187,8 +227,14 @@ func TestSample(t *testing.T) {
 	}
 	for _, it := range all {
 		t.Run(it.name, func(t *testing.T) {
-			got := iter2slice(it.factory())
-			assertEqual(t, got, it.expect)
+			switch f := it.factory.(type) {
+			case func() Iter[int]:
+				got := iter2slice(f())
+				assertEqual(t, got, it.expect)
+			case func() Iter[any]:
+				got := iter2slice(f())
+				assertEqual(t, got, it.expect)
+			}
 		})
 	}
 }

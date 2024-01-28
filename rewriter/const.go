@@ -27,7 +27,6 @@ const (
 	cstBind     = "Bind"
 	cstCombine  = "Combine"
 	cstFor      = "For"
-	cstRange    = "Range"
 	cstLoop     = "Loop"
 	cstWhile    = "While"
 )

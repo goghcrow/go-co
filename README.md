@@ -77,17 +77,38 @@ func SampleGetNumList() (_ Iter[int]) {
 
 func SampleYieldFrom() (_ Iter[int]) {
 	Yield(0)
-	YieldFrom(SampleForYield())
+	YieldFrom(SampleGetNumList())
 	Yield(4)
 	return
 }
 
-func SampleForYield() (_ Iter[int]) {
-	for i := 0; i < 5; i++ {
-		Yield(i)
-	}
-	return
+type Pair[K, V any] struct {
+    Key K
+    Val V
 }
+
+func SampleLoop() (_ Iter[any]) {
+    for i := 0; i < 5; i++ {
+      Yield(i)
+    }
+  
+    xs := []string{"a", "b", "c"}
+    for i, n := range xs {
+      Yield(Pair[int, string]{i, n})
+    }
+  
+    for i, c := range "Hello World!" {
+      Yield(Pair[int, rune]{i, c})
+    }
+  
+    m := map[string]int{"a": 1, "b": 2, "c": 3}
+    for k, v := range m {
+      Yield(Pair[string, int]{k, v})
+    }
+  
+    return
+}
+
 
 func SampleGetEvenNumbers(start, end int) (_ Iter[int]) {
 	for i := start; i < end; i++ {

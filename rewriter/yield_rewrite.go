@@ -417,9 +417,9 @@ func (r *yieldRewriter) rewriteIfStmt(
 func (r *yieldRewriter) rewriteSwitchStmt(
 	stmt ast.Stmt, // switch | typeSwitch
 	init *ast.Stmt,
-	x ast.Node, // Tag of SwitchStmt | Assign of TypeSwitchStmt
+	x ast.Node,          // Tag of SwitchStmt | Assign of TypeSwitchStmt
 	body *ast.BlockStmt, // maybe modified
-	pos *token.Pos, // maybe modified
+	pos *token.Pos,      // maybe modified
 	children *block,
 ) *block {
 	allCaseTrival := true
@@ -793,11 +793,13 @@ func (r *yieldRewriter) mustNoYield(stmt ast.Stmt) bool {
 	if isNil(stmt) {
 		return true
 	}
-	// isLast=false and kind=kindYield
-	// don't affect the result
-	b := mkBlock(kindYield)
-	r.rewriteStmt(stmt, false, b)
-	return b.mustNoYield()
+	return !r.rewriter.containsYield(X.Block(stmt))
+
+	// // isLast=false and kind=kindYield
+	// // don't affect the result
+	// b := mkBlock(kindYield)
+	// r.rewriteStmt(stmt, false, b)
+	// return b.mustNoYield()
 }
 
 func (r *rewriter) isTerminating(s ast.Stmt) bool {

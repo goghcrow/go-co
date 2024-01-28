@@ -107,7 +107,6 @@ func optimizeDelayCall(m *Matcher) {
 		cstFor,
 		cstWhile,
 		cstLoop,
-		cstRange,
 		cstReturn,
 	)
 	delayCallWithNoEffectDirectReturn := AndEx[CallExprPattern](m,

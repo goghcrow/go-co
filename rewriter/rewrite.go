@@ -191,6 +191,31 @@ func (r *rewriter) assert(ok bool, pos any, format string, a ...any) {
 	}
 }
 
+func (r *rewriter) containsYield(n *ast.BlockStmt) bool {
+	return func() (contains bool) {
+		var abort = new(int)
+		defer func() {
+			if r := recover(); r != nil && r != abort {
+				panic(r)
+			}
+		}()
+		astutil.Apply(n, func(c *astutil.Cursor) bool {
+			switch n := c.Node().(type) {
+			case *ast.FuncDecl, *ast.FuncLit:
+				return false
+			case *ast.CallExpr:
+				callee := r.ObjectOfCall(n)
+				if callee == r.yieldFunc || callee == r.yieldFromFunc {
+					contains = true
+					panic(abort)
+				}
+			}
+			return true
+		}, nil)
+		return
+	}()
+}
+
 // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Collect YieldFunc ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
 
 // collect funs which containing yield / yieldFrom called directly by reference,
@@ -285,68 +310,6 @@ func (r *rewriter) attachComment(c *astutil.Cursor) bool {
 	return true
 }
 
-// ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Rewrite ForInit ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-
-// keep shadow semantics by adding extra block,
-// prevent name conflict name in the scope after rewriteYield
-// e.g.,
-//
-//	i := 0; for i := 0; ; { ... }
-//	=>
-//	i := 0; i := 0; for ; ; { ... }
-//	=>
-//	i := 0; { i := 0; for ; ; { ... } }
-//
-//	for $init; ; { ... }
-//	=>
-//	{
-//		$init
-//		for ; ; { ... }
-//	}
-func (r *rewriter) rewriteInitStmt(c *astutil.Cursor) bool {
-	switch n := c.Node().(type) {
-	case *ast.ForStmt:
-		if isDefineStmt(n.Init) {
-			init := n.Init
-			n.Init = nil
-			n.For = token.NoPos
-			c.Replace(X.Block(init, n))
-		}
-	case *ast.SwitchStmt:
-		if isDefineStmt(n.Init) {
-			init := n.Init
-			n.Init = nil
-			n.Switch = token.NoPos
-			c.Replace(X.Block(init, n))
-		}
-	case *ast.TypeSwitchStmt:
-		if isDefineStmt(n.Init) {
-			init := n.Init
-			n.Init = nil
-			n.Switch = token.NoPos
-			c.Replace(X.Block(init, n))
-		}
-	}
-	return true
-}
-
-// ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Rewrite co.Iter ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-
-// co.Iter[T] => seq.Iterator[T]
-func (r *rewriter) rewriteIter(c *astutil.Cursor) bool {
-	switch n := c.Node().(type) {
-	case *ast.IndexExpr:
-		if r.isIterator(r.TypeOf(n.X)) {
-			c.Replace(X.Index(
-				X.PkgSelect(r.seqImportedName, cstIterator),
-				n.Index,
-			))
-		}
-		return true
-	}
-	return true
-}
-
 // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Rewrite Range Generator ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
 
 func (r *rewriter) rewriteForRanges(c *astutil.Cursor) bool {
@@ -386,4 +349,21 @@ func (r *rewriter) rewriteForRange(fr *ast.RangeStmt) *ast.ForStmt {
 		fr.Body.List...,
 	)
 	return X.ForStmt(init, cond, nil, body)
+}
+
+// ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Rewrite co.Iter ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+
+// co.Iter[T] => seq.Iterator[T]
+func (r *rewriter) rewriteIter(c *astutil.Cursor) bool {
+	switch n := c.Node().(type) {
+	case *ast.IndexExpr:
+		if r.isIterator(r.TypeOf(n.X)) {
+			c.Replace(X.Index(
+				X.PkgSelect(r.seqImportedName, cstIterator),
+				n.Index,
+			))
+		}
+		return true
+	}
+	return true
 }

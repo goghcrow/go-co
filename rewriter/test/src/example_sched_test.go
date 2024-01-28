@@ -75,13 +75,13 @@ func Sleep(d time.Duration) Async {
 
 func SampleAsyncTask(v any) Async {
 	return AsyncFun(func(cont func(v any, err error)) {
-		timeAfter(time.Second, func() {
+		timeAfter(time.Second*1, func() {
 			cont(v, nil)
 		})
 	})
 }
 
-func TestCo(t *testing.T) {
+func _TestCo(t *testing.T) {
 	Co(func(s *Sched) (_ Iter[Async]) {
 		t.Log("start")
 

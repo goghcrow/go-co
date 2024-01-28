@@ -2,60 +2,93 @@ package seq
 
 // Monadic Yield Implementation
 
-type ContType int
+type contType int
 
 const (
-	KNormal ContType = iota
-	KBreak
-	KContinue
-	KReturn
+	kNormal contType = iota
+	kBreak
+	kContinue
+	kReturn
 )
 
 type (
-	Step[V any] struct {
-		value V
-		next  func() *Step[V]
+	step[V any] struct {
+		value V       // current value
+		next  next[V] // compute the next step
 	}
-	Co[V any]   struct{ step *Step[V] } // Coroutine
-	Cont[V any] func(ContType, V)       // Continuation
-	Seq[V any]  func(*Co[V], Cont[V])   // Async Sequence / Async Enumerator
+	next[V any]     func(recv V) *step[V]   // the next step computation
+	co[V any]       struct{ step *step[V] } // coroutine, which stores the current value and the next step
+	lazy[V any]     func() Seq[V]           // thunk, boxing code after yield for later execution
+	lazyRecv[V any] func(recv V) Seq[V]     // with receive value
+	cont[V any]     func(contType, V)       // continuation
 )
 
 type (
+	Seq[V any]      func(*co[V] /*state*/, cont[V]) // Async Sequence / Async Enumerator
 	Iterator[V any] interface {
 		MoveNext() bool
 		Current() V
 	}
+	Generator[V any] interface {
+		Iterator[V]
+		Result() V
+		Send(V) (yield V, ok bool)
+	}
 	// Iterable[V any] interface{ GetIter() Iterator[V] }
 )
 
-// Start / Run / Bind (Yield) Boundary
-// **Delimited** Continuation
-func Start[V any](step Seq[V]) Iterator[V] {
-	c := &Co[V]{}
-	return NewDelegateIter[V](func() *Step[V] {
-		c.step = nil
-		step(c, func(t ContType, v V) {})
-		s := c.step
+func mkNextRecv[V any](
+	f lazyRecv[V],
+	c *co[V],
+	k cont[V],
+) next[V] {
+	return func(recv V) *step[V] {
+		// c.step = nil
+		f(recv)(c, k) // compute next, set the step if bind called,
+		s := c.step   // otherwise nil
 		c.step = nil
 		return s
-	})
+	}
 }
 
-// Bind collect pending stack frame when invoking
-// When Bind() called, saving k to Co.step.next and return immediately
-// When DelegateIter.MoveNext() called, Co.step.next will be invoked
-func Bind[V any](v V, f func() Seq[V]) Seq[V] {
-	return func(c *Co[V], k Cont[V]) {
-		c.step = &Step[V]{
+func mkNext[V any](f lazy[V], c *co[V], k cont[V]) next[V] {
+	return mkNextRecv[V](func(_ V) Seq[V] { return f() }, c, k)
+}
+
+// Start / Run a coroutine (Delimited Continuation) in boundary
+func Start[V any](seq Seq[V]) Iterator[V] {
+	var it *generator[V]
+	it = newGenerator[V](mkNext(
+		func() Seq[V] { return seq },
+		&co[V]{},
+		func(t contType, v V) {
+			// it.resultOk = true
+			it.result = v
+		},
+	))
+	return it
+}
+
+// Bind collect pending stack frame,
+// When Bind() called, saving k to co.step.next and return immediately
+// When generator.MoveNext() called, co.step.next will be invoked
+// supporting yield statement without return value ( <- iter.Send())
+func Bind[V any](v V, f lazy[V]) Seq[V] {
+	return func(c *co[V], k cont[V]) {
+		c.step = &step[V]{
 			value: v,
-			next: func() *Step[V] {
-				c.step = nil
-				f()(c, k)
-				s := c.step
-				c.step = nil
-				return s
-			},
+			next:  mkNext(f, c, k),
+		}
+	}
+}
+
+// BindRecv with return value
+// supporting yield expression with return value
+func BindRecv[V any](v V, f lazyRecv[V]) Seq[V] {
+	return func(c *co[V], k cont[V]) {
+		c.step = &step[V]{
+			value: v,
+			next:  mkNextRecv(f, c, k),
 		}
 	}
 }
@@ -65,36 +98,32 @@ func For[V any](
 	post func(),
 	body Seq[V],
 ) Seq[V] {
-	return func(c *Co[V], k Cont[V]) {
+	return func(c *co[V], k cont[V]) {
 		var loop func(skipPost bool)
 		loop = func(skipPost bool) {
 			if post != nil && !skipPost {
 				post()
 			}
 			if cond == nil || cond() {
-				body(c, func(t ContType, v V) {
+				body(c, func(t contType, v V) {
 					switch t {
-					case KNormal, KContinue:
+					case kNormal, kContinue:
 						loop(false)
-					case KBreak:
-						k(KNormal, zero[V]())
-					case KReturn:
-						k(KReturn, v)
+					case kBreak:
+						k(kNormal, zero[V]())
+					case kReturn:
+						k(kReturn, v)
 					default:
 						panic("unreachable")
 					}
 				})
 			} else {
-				k(KNormal, zero[V]())
+				k(kNormal, zero[V]())
 			}
 		}
 		loop(true)
 	}
 }
-
-// func For1[V any](cond func() bool, post, body Seq[V]) Seq[V] {
-// 	return For(cond, nil, Combine(body, post))
-// }
 
 func While[V any](cond func() bool, body Seq[V]) Seq[V] {
 	return For(cond, nil, body)
@@ -104,20 +133,19 @@ func Loop[V any](body Seq[V]) Seq[V] {
 	return For(nil, nil, body)
 }
 
-func Range[V any](cond func() bool, body Seq[V]) Seq[V] {
-	return For(cond, nil, body)
-}
-
-func Delay[V any](f func() Seq[V]) Seq[V] {
-	return func(c *Co[V], k Cont[V]) {
+func Delay[V any](f lazy[V]) Seq[V] {
+	return func(c *co[V], k cont[V]) {
 		f()(c, k)
 	}
 }
 
 func Combine[V any](s1, s2 Seq[V]) Seq[V] {
-	return func(c *Co[V], k Cont[V]) {
-		s1(c, func(t ContType, v V) {
-			if t == KNormal {
+	return func(c *co[V], k cont[V]) {
+		s1(c, func(t contType, v V) {
+			// skip s2 when break/continue/return
+			// notice: break/continue
+			// whether the outer is loop or not
+			if t == kNormal {
 				s2(c, k)
 			} else {
 				k(t, v)
@@ -126,62 +154,82 @@ func Combine[V any](s1, s2 Seq[V]) Seq[V] {
 	}
 }
 
-func Return[V any]( /*v V*/ ) Seq[V] {
-	return func(c *Co[V], k Cont[V]) {
-		v := zero[V]()
-		k(KReturn, v)
+func contSeq[V any](kt contType) Seq[V] {
+	return func(c *co[V], k cont[V]) {
+		k(kt, zero[V]())
 	}
 }
 
-func Normal[V any]() Seq[V] {
-	return func(c *Co[V], k Cont[V]) {
-		k(KNormal, zero[V]())
+func Normal[V any]() Seq[V]   { return contSeq[V](kNormal) }
+func Break[V any]() Seq[V]    { return contSeq[V](kBreak) }
+func Continue[V any]() Seq[V] { return contSeq[V](kContinue) }
+func Return[V any]() Seq[V]   { return contSeq[V](kReturn) }
+func ReturnValue[V any](v V) Seq[V] { // supporting generator with return value
+	return func(c *co[V], k cont[V]) {
+		k(kReturn, v)
 	}
 }
-
-func Break[V any]() Seq[V] {
-	return func(c *Co[V], k Cont[V]) {
-		k(KBreak, zero[V]())
-	}
-}
-
-func Continue[V any]() Seq[V] {
-	return func(c *Co[V], k Cont[V]) {
-		k(KContinue, zero[V]())
-	}
-}
-
-func zero[V any]() (z V) { return }
 
 // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Iterator ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
 
-type DelegateIter[V any] struct {
-	delegate func() *Step[V]
-	current  V
+// asyncIter
+type generator[V any] struct {
+	started bool
+	next    next[V]
+	current/*, ok*/ V
+	result/*, ok*/ V
 }
 
-// NewDelegateIter NewAsyncIter
-func NewDelegateIter[V any](delegate func() *Step[V]) *DelegateIter[V] {
-	return &DelegateIter[V]{delegate: delegate}
+func newGenerator[V any](next next[V]) *generator[V] {
+	return &generator[V]{next: next}
 }
 
-func (d *DelegateIter[V]) MoveNext() bool {
-	if d.delegate == nil {
-		// panic("illegal state")
+func (d *generator[V]) Result() V {
+	return d.result
+}
+
+func (d *generator[V]) Current() V {
+	// assert(d.started)
+	return d.current
+}
+
+func (d *generator[V]) MoveNext() bool {
+	d.started = true
+	return d.moveNext(zero[V]())
+}
+
+func (d *generator[V]) Send(v V) (V, bool) {
+	if !d.started {
+		// if the generator is not at a yield expression when this method is called,
+		// it will first be let to advance to the first yield expression before sending the value.
+		// so, the first current value would be skipped also
+		if !d.MoveNext() {
+			return zero[V](), false
+		}
+	}
+	if d.moveNext(v) {
+		return d.current, true
+	} else {
+		return zero[V](), false
+	}
+}
+
+func (d *generator[V]) moveNext(sent V) bool {
+	if d.next == nil {
 		return false
 	}
-	step := d.delegate()
-	if step == nil {
-		d.delegate = nil
+	s := d.next(sent) // compute next step
+	if s == nil {
+		d.next = nil
 		d.current = zero[V]()
 		return false
 	} else {
-		d.delegate = step.next
-		d.current = step.value
+		d.next = s.next
+		d.current = s.value
 		return true
 	}
 }
 
-func (d *DelegateIter[V]) Current() V {
-	return d.current
-}
+// ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ etc ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+
+func zero[V any]() (z V) { return }

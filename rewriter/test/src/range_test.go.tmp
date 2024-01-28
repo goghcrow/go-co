@@ -61,8 +61,10 @@ func TestRangeString(t *testing.T) {
 						return ɪʇ.MoveNext()
 					}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 						k := ɪʇ.Current().Key
-						return ʂɘʠ.Bind[int](k, func() ʂɘʠ.Seq[int] {
-							return ʂɘʠ.Normal[int]()
+						return ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Bind[int](k, func() ʂɘʠ.Seq[int] {
+								return ʂɘʠ.Normal[int]()
+							})
 						})
 					}))
 				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
@@ -83,8 +85,10 @@ func TestRangeString(t *testing.T) {
 						return ɪʇ.MoveNext()
 					}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 						k := ɪʇ.Current().Key
-						return ʂɘʠ.Bind[int](k, func() ʂɘʠ.Seq[int] {
-							return ʂɘʠ.Normal[int]()
+						return ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Bind[int](k, func() ʂɘʠ.Seq[int] {
+								return ʂɘʠ.Normal[int]()
+							})
 						})
 					}))
 				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
@@ -105,8 +109,10 @@ func TestRangeString(t *testing.T) {
 						return ɪʇ.MoveNext()
 					}, ʂɘʠ.Delay[rune](func() ʂɘʠ.Seq[rune] {
 						v := ɪʇ.Current().Val
-						return ʂɘʠ.Bind[rune](v, func() ʂɘʠ.Seq[rune] {
-							return ʂɘʠ.Normal[rune]()
+						return ʂɘʠ.Delay[rune](func() ʂɘʠ.Seq[rune] {
+							return ʂɘʠ.Bind[rune](v, func() ʂɘʠ.Seq[rune] {
+								return ʂɘʠ.Normal[rune]()
+							})
 						})
 					}))
 				}), ʂɘʠ.Delay[rune](func() ʂɘʠ.Seq[rune] {
@@ -174,8 +180,10 @@ func TestRangeSlice(t *testing.T) {
 						return ɪʇ.MoveNext()
 					}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 						k := ɪʇ.Current().Key
-						return ʂɘʠ.Bind[int](k, func() ʂɘʠ.Seq[int] {
-							return ʂɘʠ.Normal[int]()
+						return ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Bind[int](k, func() ʂɘʠ.Seq[int] {
+								return ʂɘʠ.Normal[int]()
+							})
 						})
 					}))
 				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
@@ -196,8 +204,10 @@ func TestRangeSlice(t *testing.T) {
 						return ɪʇ.MoveNext()
 					}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 						k := ɪʇ.Current().Key
-						return ʂɘʠ.Bind[int](k, func() ʂɘʠ.Seq[int] {
-							return ʂɘʠ.Normal[int]()
+						return ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Bind[int](k, func() ʂɘʠ.Seq[int] {
+								return ʂɘʠ.Normal[int]()
+							})
 						})
 					}))
 				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
@@ -218,8 +228,10 @@ func TestRangeSlice(t *testing.T) {
 						return ɪʇ.MoveNext()
 					}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 						v := ɪʇ.Current().Val
-						return ʂɘʠ.Bind[int](v, func() ʂɘʠ.Seq[int] {
-							return ʂɘʠ.Normal[int]()
+						return ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Bind[int](v, func() ʂɘʠ.Seq[int] {
+								return ʂɘʠ.Normal[int]()
+							})
 						})
 					}))
 				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
@@ -287,8 +299,10 @@ func TestRangeArray(t *testing.T) {
 						return ɪʇ.MoveNext()
 					}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 						k := ɪʇ.Current().Key
-						return ʂɘʠ.Bind[int](k, func() ʂɘʠ.Seq[int] {
-							return ʂɘʠ.Normal[int]()
+						return ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Bind[int](k, func() ʂɘʠ.Seq[int] {
+								return ʂɘʠ.Normal[int]()
+							})
 						})
 					}))
 				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
@@ -309,8 +323,10 @@ func TestRangeArray(t *testing.T) {
 						return ɪʇ.MoveNext()
 					}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 						k := ɪʇ.Current().Key
-						return ʂɘʠ.Bind[int](k, func() ʂɘʠ.Seq[int] {
-							return ʂɘʠ.Normal[int]()
+						return ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Bind[int](k, func() ʂɘʠ.Seq[int] {
+								return ʂɘʠ.Normal[int]()
+							})
 						})
 					}))
 				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
@@ -331,8 +347,10 @@ func TestRangeArray(t *testing.T) {
 						return ɪʇ.MoveNext()
 					}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 						v := ɪʇ.Current().Val
-						return ʂɘʠ.Bind[int](v, func() ʂɘʠ.Seq[int] {
-							return ʂɘʠ.Normal[int]()
+						return ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Bind[int](v, func() ʂɘʠ.Seq[int] {
+								return ʂɘʠ.Normal[int]()
+							})
 						})
 					}))
 				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
@@ -402,8 +420,10 @@ func TestRangeMap(t *testing.T) {
 						return ɪʇ.MoveNext()
 					}, ʂɘʠ.Delay[string](func() ʂɘʠ.Seq[string] {
 						k := ɪʇ.Current().Key
-						return ʂɘʠ.Bind[string](k, func() ʂɘʠ.Seq[string] {
-							return ʂɘʠ.Normal[string]()
+						return ʂɘʠ.Delay[string](func() ʂɘʠ.Seq[string] {
+							return ʂɘʠ.Bind[string](k, func() ʂɘʠ.Seq[string] {
+								return ʂɘʠ.Normal[string]()
+							})
 						})
 					}))
 				}), ʂɘʠ.Delay[string](func() ʂɘʠ.Seq[string] {
@@ -427,8 +447,10 @@ func TestRangeMap(t *testing.T) {
 						return ɪʇ.MoveNext()
 					}, ʂɘʠ.Delay[string](func() ʂɘʠ.Seq[string] {
 						k := ɪʇ.Current().Key
-						return ʂɘʠ.Bind[string](k, func() ʂɘʠ.Seq[string] {
-							return ʂɘʠ.Normal[string]()
+						return ʂɘʠ.Delay[string](func() ʂɘʠ.Seq[string] {
+							return ʂɘʠ.Bind[string](k, func() ʂɘʠ.Seq[string] {
+								return ʂɘʠ.Normal[string]()
+							})
 						})
 					}))
 				}), ʂɘʠ.Delay[string](func() ʂɘʠ.Seq[string] {
@@ -452,8 +474,10 @@ func TestRangeMap(t *testing.T) {
 						return ɪʇ.MoveNext()
 					}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 						v := ɪʇ.Current().Val
-						return ʂɘʠ.Bind[int](v, func() ʂɘʠ.Seq[int] {
-							return ʂɘʠ.Normal[int]()
+						return ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Bind[int](v, func() ʂɘʠ.Seq[int] {
+								return ʂɘʠ.Normal[int]()
+							})
 						})
 					}))
 				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
@@ -530,8 +554,10 @@ func TestRangeChan(t *testing.T) {
 						return ɪʇ.MoveNext()
 					}, ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
 						v := ɪʇ.Current().Key
-						return ʂɘʠ.Bind[int](v, func() ʂɘʠ.Seq[int] {
-							return ʂɘʠ.Normal[int]()
+						return ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {
+							return ʂɘʠ.Bind[int](v, func() ʂɘʠ.Seq[int] {
+								return ʂɘʠ.Normal[int]()
+							})
 						})
 					}))
 				}), ʂɘʠ.Delay[int](func() ʂɘʠ.Seq[int] {

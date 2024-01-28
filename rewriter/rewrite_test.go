@@ -9,14 +9,6 @@ import (
 	"github.com/goghcrow/go-ast-matcher"
 )
 
-func TestTest(t *testing.T) {
-	Compile("./test/src",
-		"./test/out",
-		matcher.PatternAll,
-		matcher.WithLoadTest(),
-	)
-}
-
 func TestRewrite(t *testing.T) {
 	in := "test/src"
 	out := "test/out"

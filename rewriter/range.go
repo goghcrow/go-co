@@ -2,6 +2,7 @@ package rewriter
 
 import (
 	"go/ast"
+	"go/token"
 	"go/types"
 	"strconv"
 
@@ -22,17 +23,17 @@ func (r *yieldRewriter) ignoreKeyVal(k, v ast.Expr) (bool, bool) {
 }
 
 func (r *yieldRewriter) rewriteRanges(block *ast.BlockStmt) {
-	do := func(c *astutil.Cursor, n *ast.RangeStmt, ctor string, arg ast.Expr) {
-		factory := r.SeqSelect(ctor)
-		iter := X.Call(factory, arg)
-		init, forStmt := r.rewriteRangeToForIter(n, iter)
-		c.InsertBefore(init)
-		c.Replace(forStmt)
-	}
-
 	astutil.Apply(block, nil, func(c *astutil.Cursor) bool {
 		switch n := c.Node().(type) {
 		case *ast.RangeStmt:
+			do := func(ctor string, arg ast.Expr) {
+				factory := r.SeqSelect(ctor)
+				iter := X.Call(factory, arg)
+				init, forStmt := r.rewriteRangeToForIter(n, iter)
+				c.InsertBefore(init)
+				c.Replace(forStmt)
+			}
+
 			ty := r.rewriter.TypeOf(n.X)
 			r.assert(!isNil(ty), n.X, "type missing")
 			ty = ty.Underlying()
@@ -41,21 +42,22 @@ func (r *yieldRewriter) rewriteRanges(block *ast.BlockStmt) {
 			case *types.Basic:
 				switch {
 				case ty.Info()&types.IsString != 0:
-					do(c, n, cstNewStringIter, n.X)
+					do(cstNewStringIter, n.X)
 				case ty.Info()&types.IsInteger != 0:
 					// >= 1.22 only, but no release, need test
-					do(c, n, cstNewIntegerIter, n.X)
+					do(cstNewIntegerIter, n.X)
 				}
 			case *types.Array:
 				// typing workaround for abstract generic array iter
-				typeInferedSlice := &ast.SliceExpr{X: n.X}
-				do(c, n, cstNewSliceIter, typeInferedSlice)
+				// type can't be infered from array, so we wrap it with slice
+				typeInfered := &ast.SliceExpr{X: n.X}
+				do(cstNewSliceIter, typeInfered)
 			case *types.Slice:
-				do(c, n, cstNewSliceIter, n.X)
+				do(cstNewSliceIter, n.X)
 			case *types.Map:
-				do(c, n, cstNewMapIter, n.X)
+				do(cstNewMapIter, n.X)
 			case *types.Chan:
-				do(c, n, cstNewChanIter, n.X)
+				do(cstNewChanIter, n.X)
 			case *types.Signature:
 				panic("implement me: range func")
 			}
@@ -83,7 +85,9 @@ func (r *yieldRewriter) rewriteRangeToForIter(
 	ignoreKey, ignoreVal := r.ignoreKeyVal(n.Key, n.Value)
 	switch {
 	case ignoreKey && ignoreVal:
-		// do nothing
+		forStmt = X.ForStmt(nil, cond, nil, n.Body)
+		return
+
 	case ignoreVal:
 		kv = X.Assign(n.Tok, n.Key, X.Select(X.Call(current), cstPairKey))
 	case ignoreKey:
@@ -96,11 +100,22 @@ func (r *yieldRewriter) rewriteRangeToForIter(
 		)
 	}
 
-	forStmt = X.ForStmt(
-		nil,
-		cond,
-		nil,
-		X.Block1(kv, n.Body.List...),
-	)
+	if n.Tok == token.DEFINE {
+		// wrap BlockStmt, prevent from name conflicting
+		// for k, v := range it { k, v :=...  }
+		// 	=>
+		// it := NewXXXIter(it)
+		// for it.MoveNext() {
+		// 		k,v := it.Current().Key, it.Current().Val
+		//		{
+		//			k, v :=...
+		//		}
+		// }
+		body := X.Block(kv, n.Body)
+		forStmt = X.ForStmt(nil, cond, nil, body)
+	} else {
+		body := X.Block1(kv, n.Body.List...)
+		forStmt = X.ForStmt(nil, cond, nil, body)
+	}
 	return
 }

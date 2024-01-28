@@ -7,17 +7,15 @@ import (
 	. "github.com/goghcrow/go-co"
 )
 
-func iter2slice[V any](g Iter[V]) []V {
-	var s []V
+func iter2slice[V any](g Iter[V]) (xs []V) {
 	for i := range g {
-		s = append(s, i)
+		xs = append(xs, i)
 	}
-	return s
+	return xs
 }
 
-func assertEqual(t *testing.T, a, b interface{}) {
-	if !reflect.DeepEqual(a, b) {
-		t.Logf("expect %+v got %+v", b, a)
-		t.FailNow()
+func assertEqual(t *testing.T, got, expect any) {
+	if !reflect.DeepEqual(got, expect) {
+		t.Errorf("expect\n%+v\n\ngot\n%+v", expect, got)
 	}
 }
