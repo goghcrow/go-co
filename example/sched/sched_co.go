@@ -7,8 +7,6 @@ package sched
 
 import (
 	"sync"
-	"testing"
-	"time"
 
 	. "github.com/goghcrow/go-co"
 )
@@ -66,57 +64,4 @@ type AsyncFun func(cont func(v any, err error))
 
 func (f AsyncFun) Begin(cont func(v any, err error)) {
 	f(cont)
-}
-
-// ------------------------------------------------------------
-
-func Sleep(d time.Duration) Async {
-	return AsyncFun(func(cont func(v any, err error)) {
-		timeAfter(d, func() {
-			cont(nil, nil)
-		})
-	})
-}
-
-func SampleAsyncTask(v any) Async {
-	return AsyncFun(func(cont func(v any, err error)) {
-		timeAfter(time.Second*1, func() {
-			cont(v, nil)
-		})
-	})
-}
-
-func _TestCo(t *testing.T) {
-	Co(func(s *Sched) (_ Iter[Async]) {
-		t.Log("start")
-
-		t.Log(now() + " before sleep")
-		Yield(Sleep(time.Second * 1))
-
-		t.Log(now() + " before async task")
-		Yield(SampleAsyncTask(42))
-
-		t.Log(now() + " after async task and get result")
-		result, _ := s.GetReceive()
-		t.Log(result)
-
-		t.Log("end")
-		return
-	})
-
-	wg.Wait()
-}
-
-// ------------------------------------------------------------
-
-// fake callback
-func timeAfter(d time.Duration, cb func()) {
-	go func() {
-		time.Sleep(d)
-		cb()
-	}()
-}
-
-func now() string {
-	return time.Now().Format("2006-01-02 15:04:05")
 }

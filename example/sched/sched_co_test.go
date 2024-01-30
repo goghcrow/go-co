@@ -9,7 +9,33 @@ import (
 	. "github.com/goghcrow/go-co"
 )
 
+// fake callback
+func timeAfter(d time.Duration, cb func()) {
+	go func() {
+		time.Sleep(d)
+		cb()
+	}()
+}
+
+func Sleep(d time.Duration) Async {
+	return AsyncFun(func(cont func(v any, err error)) {
+		timeAfter(d, func() {
+			cont(nil, nil)
+		})
+	})
+}
+
+func SampleAsyncTask(v any) Async {
+	return AsyncFun(func(cont func(v any, err error)) {
+		timeAfter(time.Second*1, func() {
+			cont(v, nil)
+		})
+	})
+}
+
 func TestCo(t *testing.T) {
+	now := func() string { return time.Now().Format("2006-01-02 15:04:05") }
+
 	Co(func(s *Sched) (_ Iter[Async]) {
 		t.Log("start")
 
