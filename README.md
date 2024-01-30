@@ -2,34 +2,9 @@
 
 > **The Old New Thing**
 
-go-co(routine) is a **Source to Source Compiler** which rewrites trival yield statement to monadic style code.
+go-co(routine) is a **Source to Source Compiler** which rewrites trival yield statements to monadic style code.
 
 Inspired by [wind-js](https://github.com/JeffreyZhao/wind).
-
-## Control Flow Support
-
-Rewrite control flow to monadic func invoking.
-
-- [x] IfStmt
-- [x] SwitchStmt
-  - [ ] Fallthrough
-- [x] TypeSwitchStmt
-- [x] ForStmt
-- [x] RangeStmt
-  - [x] string
-  - [x] slice
-  - [x] map
-  - [x] array
-  - [x] integer
-  - [x] channel
-  - [ ] range func
-- [x] BlockStmt
-- [x] Break / Continue 
-  - [x] Non-Label
-  - [ ] Label
-- [ ] Goto
-- [ ] SelectStmt
-- [ ] DeferStmt
 
 
 ## Quick Start
@@ -91,3 +66,28 @@ func main() {
     )
 }
 ```
+
+## Control Flow Support
+
+Rewrite control flow to monadic func invoking.
+
+- [x] IfStmt
+- [x] SwitchStmt
+  - [ ] Fallthrough
+- [x] TypeSwitchStmt
+- [x] ForStmt
+- [x] RangeStmt
+  - [x] string
+  - [x] slice
+  - [x] map
+  - [x] array
+  - [x] integer
+  - [x] channel
+  - [ ] range func
+- [x] BlockStmt
+- [x] Break / Continue
+  - [x] Non-Label
+  - [ ] Label
+- [ ] Goto
+- [ ] SelectStmt
+- [ ] DeferStmt
