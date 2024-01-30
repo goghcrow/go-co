@@ -9,3 +9,12 @@ rewriter/test/out_tmp
 
 rewriter/rewrite_dbg_test.go
 rewriter/test/src/dbg_test.go
+
+example/example.go
+example/example_test.go
+example/lexer/lexer.go
+example/lexer/lexer_test.go
+example/sched/sched.go
+example/sched/sched_test.go
+example/tree/tree.go
+example/tree/tree_test.go
