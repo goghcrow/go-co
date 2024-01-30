@@ -4,7 +4,6 @@ import (
 	"go/ast"
 	"go/token"
 
-	"github.com/goghcrow/go-ast-matcher"
 	"golang.org/x/tools/go/ast/astutil"
 )
 
@@ -12,26 +11,13 @@ import (
 // cropping label control flow, cause of no supporting in yield func
 
 type terminationChecker struct {
-	r       *rewriter
-	isPanic map[*ast.CallExpr]bool
+	panicCallSites map[*ast.CallExpr]bool
 }
 
-func mkTerminationChecker(r *rewriter) *terminationChecker {
+func mkTerminationChecker(panicCallSites map[*ast.CallExpr]bool) *terminationChecker {
 	return &terminationChecker{
-		r:       r,
-		isPanic: make(map[*ast.CallExpr]bool),
+		panicCallSites: panicCallSites,
 	}
-}
-
-func (check *terminationChecker) collectPanic(s ast.Stmt) {
-	callPanic := matcher.BuiltinCallee(check.r.Matcher, "panic")
-	check.r.MatchNode(
-		callPanic,
-		s,
-		func(m *matcher.Matcher, c *astutil.Cursor, stack []ast.Node, binds matcher.Binds) {
-			check.isPanic[c.Node().(*ast.CallExpr)] = true
-		},
-	)
 }
 
 func (check *terminationChecker) isTerminating(s ast.Stmt) bool {
@@ -49,7 +35,7 @@ func (check *terminationChecker) isTerminating(s ast.Stmt) bool {
 
 	case *ast.ExprStmt:
 		// calling the predeclared (possibly parenthesized) panic() function is terminating
-		if call, ok := astutil.Unparen(s.X).(*ast.CallExpr); ok && check.isPanic[call] {
+		if call, ok := astutil.Unparen(s.X).(*ast.CallExpr); ok && check.panicCallSites[call] {
 			return true
 		}
 

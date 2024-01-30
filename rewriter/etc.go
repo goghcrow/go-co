@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"go/types"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 
@@ -306,6 +307,14 @@ func isNil(n any) bool {
 func instanceof[T any](x any) (ok bool) {
 	_, ok = x.(T)
 	return
+}
+
+func mkDir(dir string) string {
+	dir, err := filepath.Abs(dir)
+	panicIf(err)
+	err = os.MkdirAll(dir, os.ModePerm)
+	panicIf(err)
+	return dir
 }
 
 func panicIf(err error) {

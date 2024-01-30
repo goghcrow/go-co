@@ -148,7 +148,7 @@ func (b *block) mustNoYield() bool {
 	return !b.mayContainsYield()
 }
 
-func (b *block) returnNormalRequired(r *rewriter) bool {
+func (b *block) returnNormalRequired(isTerminating func(ast.Stmt) bool) bool {
 	assert(b.kind == kindDelay ||
 		b.kind == kindFor || b.kind == kindIf)
 
@@ -177,6 +177,6 @@ func (b *block) returnNormalRequired(r *rewriter) bool {
 		// 	kindFor: children.pushReturn(callFor, kindFor)
 		// 	kindIf, kindSwitch, kindTrival: ↓↓↓
 	case kindIf, kindSwitch, kindTrival:
-		return !r.isTerminating(last)
+		return !isTerminating(last)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"go/types"
 	"log"
 
+	matcher "github.com/goghcrow/go-ast-matcher"
 	"golang.org/x/tools/go/ast/astutil"
 )
 
@@ -313,7 +314,7 @@ func (r *yieldRewriter) rewriteBlockStmt(
 // additional return-normal() required
 // when last stmt is kindIf / kindSwitch / kindTrival
 func (r *yieldRewriter) generateLastNormalIfNecessary(children *block) {
-	if children.returnNormalRequired(r.rewriter) {
+	if children.returnNormalRequired(r.isTerminating) {
 		// markCombined manually, cause of no need to check
 		// when normal return required
 		children.markCombined()
@@ -417,9 +418,9 @@ func (r *yieldRewriter) rewriteIfStmt(
 func (r *yieldRewriter) rewriteSwitchStmt(
 	stmt ast.Stmt, // switch | typeSwitch
 	init *ast.Stmt,
-	x ast.Node,          // Tag of SwitchStmt | Assign of TypeSwitchStmt
+	x ast.Node, // Tag of SwitchStmt | Assign of TypeSwitchStmt
 	body *ast.BlockStmt, // maybe modified
-	pos *token.Pos,      // maybe modified
+	pos *token.Pos, // maybe modified
 	children *block,
 ) *block {
 	allCaseTrival := true
@@ -739,7 +740,7 @@ func (r *yieldRewriter) rewriteBreakContinues(body *ast.BlockStmt) {
 				isRetNormal := len(ret.Results) == 1 && ret.Results[0] == r.callNormal
 				if isRetNormal {
 					stmts := body.List[:len(body.List)-1]
-					if r.rewriter.isTerminating(X.Block(stmts...)) {
+					if r.isTerminating(X.Block(stmts...)) {
 						body.List = stmts
 					}
 				}
@@ -802,10 +803,16 @@ func (r *yieldRewriter) mustNoYield(stmt ast.Stmt) bool {
 	// return b.mustNoYield()
 }
 
-func (r *rewriter) isTerminating(s ast.Stmt) bool {
-	checker := mkTerminationChecker(r)
-	checker.collectPanic(s)
-	return checker.isTerminating(s)
+func (r *yieldRewriter) isTerminating(s ast.Stmt) bool {
+	m := r.rewriter.Matcher
+	panicCallSites := make(map[*ast.CallExpr]bool)
+	m.MatchNode(matcher.BuiltinCallee(m, "panic"), s,
+		func(m *matcher.Matcher, c *astutil.Cursor, stack []ast.Node, binds matcher.Binds) {
+			panicCallSites[c.Node().(*ast.CallExpr)] = true
+		},
+	)
+
+	return mkTerminationChecker(panicCallSites).isTerminating(s)
 }
 
 func (r *yieldRewriter) assert(

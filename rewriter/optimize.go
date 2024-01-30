@@ -3,20 +3,22 @@ package rewriter
 import (
 	"go/ast"
 	"log"
-	"strings"
 
 	. "github.com/goghcrow/go-ast-matcher"
 	"github.com/goghcrow/go-ast-matcher/imports"
 	"golang.org/x/tools/go/ast/astutil"
 )
 
-func optimize(
-	inputDir, outputDir string,
-	patterns []string,
-	opts ...MatchOption,
-) {
-	opts = append(opts, WithSuppressErrors())
-	m := newMatcher(inputDir, outputDir, patterns, opts...)
+type optimizer struct {
+	*Matcher
+}
+
+func mkOptimizer(m *Matcher) *optimizer {
+	return &optimizer{m}
+}
+
+func (o *optimizer) optimizeAllFiles(printer FilePrinter) {
+	m := o.Matcher
 	seqPkg := m.All[pkgSeqPath]
 	if seqPkg == nil {
 		log.Printf("skip optimize: no import %s\n", pkgSeqPath)
@@ -31,21 +33,32 @@ func optimize(
 
 		// 1. optimize file
 		log.Printf("visit file: %s\n", m.Filename)
-		optimizeImports(m)
-		optimizeDelayCall(m)
-		// optimizeBindCall(m)
-		etaReduction(m)
+		o.optimizeImports()
+		o.optimizeDelayCall()
+		// o.optimizeBindCall()
+		o.etaReduction()
 
 		// 2. write file
 		log.Printf("write file: %s\n", m.Filename)
-		filename := strings.ReplaceAll(m.Filename, m.Cfg.Dir, outputDir)
-		m.WriteGeneratedFile(filename, pkgCoPath)
+		printer(m.Filename, file)
 	})
 }
 
-func optimizeImports(m *Matcher) {
-	imports.Clean(m, m.File)
+func (o *optimizer) optimizeImports() {
+	imports.Clean(o.Matcher, o.File)
 }
+
+// NOTICE:
+// Combine($seq, Return()) can be optimized to $seq
+// e.g.,
+//  for {
+//		// Combine(For(...), Return())
+//		for i := 0; i < 3; i++ {
+//			Yield(i)
+//		}
+//		return nil
+//	}
+// endless loop without Return()
 
 // NOTICE:
 // Delay[int](func() Seq { return Bind($variable, ...) })  !=> Bind($variable, ...)
@@ -76,7 +89,8 @@ func optimizeImports(m *Matcher) {
 //					})===     )
 //				}))
 //			}
-func optimizeDelayCall(m *Matcher) {
+func (o *optimizer) optimizeDelayCall() {
+	m := o.Matcher
 	var calleeOf func(...string) CallExprPattern
 	calleeOf = func(xs ...string) CallExprPattern {
 		assert(len(xs) > 0)
@@ -140,7 +154,8 @@ func optimizeDelayCall(m *Matcher) {
 
 // eat reduction overrides this particularity optimization
 // no longer required
-func optimizeBindCall(m *Matcher) {
+func (o *optimizer) optimizeBindCall() {
+	m := o.Matcher
 	// Bind[T](*, func() Seq[T] { return [Normal|Break|Continue|...]() })
 	// =>
 	// Bind[T](*, [Normal|Break|Continue|...]())
@@ -173,7 +188,8 @@ func optimizeBindCall(m *Matcher) {
 }
 
 // fun(...args) { return return f(...args) }  ==>  f
-func etaReduction(m *Matcher) {
+func (o *optimizer) etaReduction() {
+	m := o.Matcher
 	pattern := &ast.FuncLit{
 		Type: &ast.FuncType{
 			Params: MkVar[FieldListPattern](m, "params"),

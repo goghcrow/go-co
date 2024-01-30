@@ -6,127 +6,11 @@ import (
 	"go/token"
 	"go/types"
 	"log"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/goghcrow/go-ast-matcher"
 	"github.com/goghcrow/go-ast-matcher/imports"
 	"golang.org/x/tools/go/ast/astutil"
 )
-
-func Compile(
-	inputDir, outputDir string,
-	patterns []string,
-	opts ...matcher.MatchOption,
-) {
-	flags := log.Flags()
-	defer log.SetFlags(flags)
-	log.SetFlags(0)
-
-	tmpOut := outputDir + "_tmp"
-	_ = os.RemoveAll(tmpOut)
-
-	log.SetPrefix("[rewrite] ")
-	rewrite(inputDir, tmpOut, patterns, opts...)
-
-	// type info broken after rewriting, so reload to optimize
-	log.SetPrefix("[optimize] ")
-	optimize(tmpOut, outputDir, patterns, opts...)
-}
-
-func newMatcher(inputDir, outputDir string,
-	patterns []string,
-	opts ...matcher.MatchOption,
-) *matcher.Matcher {
-	inputDir, err := filepath.Abs(inputDir)
-	panicIf(err)
-
-	outputDir, err = filepath.Abs(outputDir)
-	panicIf(err)
-
-	if inputDir == outputDir {
-		panic("overwrite")
-	}
-
-	err = os.MkdirAll(outputDir, os.ModePerm)
-	panicIf(err)
-
-	return matcher.NewMatcher(
-		inputDir,
-		patterns,
-		append(opts, matcher.WithLoadDepts())...,
-	)
-}
-
-func rewrite(
-	inputDir, outputDir string,
-	patterns []string,
-	opts ...matcher.MatchOption,
-) {
-	m := newMatcher(inputDir, outputDir, patterns, opts...)
-
-	r := &rewriter{
-		Matcher:       m,
-		iterType:      m.MustLookup(qualifiedIter),
-		yieldFunc:     m.MustLookup(qualifiedYield),
-		yieldFromFunc: m.MustLookup(qualifiedYieldFrom),
-	}
-
-	coPkg := r.All[pkgCoPath]
-	if coPkg == nil {
-		log.Printf("skip rewrite: no import %s\n", pkgCoPath)
-		return
-	}
-
-	parseOrImport := func(f *ast.File) (coName, seqName string) {
-		coName = imports.ImportName(f, pkgCoPath, pkgCoName)
-		assert(coName != "") // coPkg != nil
-		seqName = imports.ImportName(f, pkgSeqPath, pkgSeqName)
-		if seqName == "" {
-			seqName = importSeqName
-			astutil.AddNamedImport(m.FSet, f, importSeqName, pkgSeqPath)
-		}
-		return
-	}
-
-	r.VisitAllFiles(func(m *matcher.Matcher, file *ast.File) {
-		if !imports.Uses(m, file, coPkg.Types) {
-			log.Printf("skip file: %s\n", r.Filename)
-			return
-		}
-
-		// 1. init file context
-		r.coImportedName, r.seqImportedName = parseOrImport(file) // parse import name
-		r.comments = nil
-
-		r.yieldFuncDecls = map[*ast.FuncDecl]bool{}
-		r.yieldFuncLits = map[*ast.FuncLit]bool{}
-		r.collectYieldFunc(file) // collect func with yield/yieldFrom call
-
-		// 2. rewrite file
-		log.Printf("visit file: %s\n", r.Filename)
-		do := func(f astutil.ApplyFunc) { astutil.Apply(file, nil, f) }
-
-		// file level instance for file scope cache
-		// notice: order matters
-		do(r.attachComment)        // attach the original source to comments
-		do(mkYieldFromRewriter(r)) // rewrite yieldFrom() to range yield() (range co.Iter)
-		do(r.rewriteForRanges)     // rewrite range co.Iter to for loop co.Iter
-		do(mkYieldRewriter(r))     // rewrite yield func
-		do(r.rewriteIter)          // rewrite all co.Iter to seq.Iterator
-
-		// 3. write file
-		log.Printf("write file: %s\n", r.Filename)
-		// clear free-floating comments, preventing confusing position of comments
-		// https://github.com/golang/go/issues/20744
-		r.File.Comments = r.comments
-		filename := strings.ReplaceAll(r.Filename, m.Cfg.Dir, outputDir)
-		r.WriteGeneratedFile(filename, pkgCoPath)
-	})
-}
-
-// ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Rewriter ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
 
 type rewriter struct {
 	*matcher.Matcher
@@ -142,6 +26,15 @@ type rewriter struct {
 	yieldFuncDecls  map[*ast.FuncDecl]bool
 	yieldFuncLits   map[*ast.FuncLit]bool
 	comments        []*ast.CommentGroup
+}
+
+func mkRewriter(m *matcher.Matcher) *rewriter {
+	return &rewriter{
+		Matcher:       m,
+		iterType:      m.MustLookup(qualifiedIter),
+		yieldFunc:     m.MustLookup(qualifiedYield),
+		yieldFromFunc: m.MustLookup(qualifiedYieldFrom),
+	}
 }
 
 // Yield is stmt, not expr
@@ -174,23 +67,6 @@ func (r *rewriter) isIterator(ty types.Type) bool {
 	return identicalWithoutTypeParam(r.iterType.Type(), ty)
 }
 
-func (r *rewriter) assert(ok bool, pos any, format string, a ...any) {
-	if !ok {
-		loc := "unknown"
-		if !isNil(pos) {
-			switch pos := pos.(type) {
-			case ast.Node:
-				loc = r.ShowPos(pos)
-			case token.Pos:
-				loc = r.FSet.Position(pos).String()
-			case string:
-				loc = pos
-			}
-		}
-		panic(fmt.Sprintf(format, a...) + " in: " + loc)
-	}
-}
-
 func (r *rewriter) containsYield(n *ast.BlockStmt) bool {
 	return func() (contains bool) {
 		var abort = new(int)
@@ -214,6 +90,81 @@ func (r *rewriter) containsYield(n *ast.BlockStmt) bool {
 		}, nil)
 		return
 	}()
+}
+
+func (r *rewriter) assert(ok bool, pos any, format string, a ...any) {
+	if !ok {
+		loc := "unknown"
+		if !isNil(pos) {
+			switch pos := pos.(type) {
+			case ast.Node:
+				loc = r.ShowPos(pos)
+			case token.Pos:
+				loc = r.FSet.Position(pos).String()
+			case string:
+				loc = pos
+			}
+		}
+		panic(fmt.Sprintf(format, a...) + " in: " + loc)
+	}
+}
+
+// ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Rewrite ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+
+func (r *rewriter) rewriteAllFiles(printer FilePrinter) {
+	coPkg := r.All[pkgCoPath]
+	if coPkg == nil {
+		log.Printf("skip rewrite: no import %s\n", pkgCoPath)
+		return
+	}
+
+	r.VisitAllFiles(func(m *matcher.Matcher, file *ast.File) {
+		if !imports.Uses(m, file, coPkg.Types) {
+			log.Printf("skip file: %s\n", r.Filename)
+			return
+		}
+		r.rewriteFile(file, printer)
+	})
+}
+
+func (r *rewriter) rewriteFile(file *ast.File, printer FilePrinter) {
+	parseOrImport := func(f *ast.File) (coName, seqName string) {
+		coName = imports.ImportName(f, pkgCoPath, pkgCoName)
+		assert(coName != "") // coPkg != nil
+		seqName = imports.ImportName(f, pkgSeqPath, pkgSeqName)
+		if seqName == "" {
+			seqName = importSeqName
+			astutil.AddNamedImport(r.FSet, f, importSeqName, pkgSeqPath)
+		}
+		return
+	}
+
+	// 1. init context
+	r.coImportedName, r.seqImportedName = parseOrImport(file) // parse import name
+	r.comments = nil
+
+	r.yieldFuncDecls = map[*ast.FuncDecl]bool{}
+	r.yieldFuncLits = map[*ast.FuncLit]bool{}
+	r.collectYieldFunc(file) // collect func with yield/yieldFrom call
+
+	// 2. edit file
+	log.Printf("visit file: %s\n", r.Filename)
+	do := func(f astutil.ApplyFunc) { astutil.Apply(file, nil, f) }
+
+	// file level instance for file scope cache
+	// notice: order matters
+	do(r.attachComment)        // attach the original source to comments
+	do(mkYieldFromRewriter(r)) // rewrite yieldFrom() to range yield() (range co.Iter)
+	do(r.rewriteForRanges)     // rewrite range co.Iter to for loop co.Iter
+	do(mkYieldRewriter(r))     // rewrite yield func
+	do(r.rewriteIter)          // rewrite all co.Iter to seq.Iterator
+
+	// 3. write file
+	log.Printf("write file: %s\n", r.Filename)
+	// clear free-floating comments, preventing confusing position of comments
+	// https://github.com/golang/go/issues/20744
+	r.File.Comments = r.comments
+	printer(r.Filename, file)
 }
 
 // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Collect YieldFunc ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
