@@ -6,7 +6,7 @@ go-co(routine) is a **Source to Source Compiler** which rewrites trival yield ex
 
 Inspired by [wind-js](https://github.com/JeffreyZhao/wind).
 
-## [WIP]Control Flow Support
+## Control Flow Support
 
 Rewrite control flow to monadic func invoking.
 
