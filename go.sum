@@ -3,6 +3,8 @@ github.com/goghcrow/go-ast-matcher v0.0.13-0.20240122164752-8b23ddb7d0dc h1:801g
 github.com/goghcrow/go-ast-matcher v0.0.13-0.20240122164752-8b23ddb7d0dc/go.mod h1:ETBvhixLHIMi4orU0A0Bt5I1p3H5y5tg5hiAtSPnuKQ=
 github.com/goghcrow/go-ast-matcher v0.0.13-0.20240130172005-4c2f7da9fc9d h1:H/gwbhNWK3xlWokORRP+QhKJra7Bvm7Frt08Ci4prF4=
 github.com/goghcrow/go-ast-matcher v0.0.13-0.20240130172005-4c2f7da9fc9d/go.mod h1:ETBvhixLHIMi4orU0A0Bt5I1p3H5y5tg5hiAtSPnuKQ=
+github.com/goghcrow/go-ast-matcher v0.0.13-0.20240130184623-e1946368edb4 h1://JPNMs3XtqFN4aGfIT1tSzUzGxLy/at75RjLhHHXPI=
+github.com/goghcrow/go-ast-matcher v0.0.13-0.20240130184623-e1946368edb4/go.mod h1:ETBvhixLHIMi4orU0A0Bt5I1p3H5y5tg5hiAtSPnuKQ=
 golang.org/x/mod v0.14.0 h1:dGoOF9QVLYng8IHTm7BAyWqCqSheQ5pYWGhzW00YJr0=
 golang.org/x/mod v0.14.0/go.mod h1:hTbmBsO62+eylJbnUtE2MGJUyE7QWk4xUqPFrRgJ+7c=
 golang.org/x/sync v0.6.0 h1:5BMeUDZ7vkXGfEr1x9B4bRcTH4lpkTkpdh0T/J+qjbQ=

@@ -1,4 +1,9 @@
-package src
+//go:build co
+
+//go:generate go install github.com/goghcrow/go-co/cmd/cogen
+//go:generate cogen
+
+package sched
 
 import (
 	"sync"
