@@ -54,7 +54,7 @@ func SampleLoopMap() (_ Iter[Pair[string, int]]) {
 	for k, v := range m {
 		Yield(Pair[string, int]{k, v})
 	}
-	return nil
+	return
 }
 
 func SampleGetEvenNumbers(start, end int) (_ Iter[int]) {
@@ -83,7 +83,7 @@ func Fibonacci() Iter[int] {
 }
 
 func Range(start, end, step int) (_ Iter[int]) {
-	for i := start; i <= end; i += step {
+	for i := start; i < end; i += step {
 		Yield(i)
 	}
 	return

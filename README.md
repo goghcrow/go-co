@@ -19,12 +19,10 @@ Run `go generate -tags co ./...` (or IDE whatever)
 //go:generate go install github.com/goghcrow/go-co/cmd/cogen
 //go:generate cogen
 
-package pkg
+package main
 
 import (
 	. "github.com/goghcrow/go-co"
-    // or
-    // "github.com/goghcrow/go-co"
 )
 
 func Fibonacci() Iter[int] {
@@ -33,6 +31,15 @@ func Fibonacci() Iter[int] {
     Yield(b)
     a, b = b, a+b
   }
+}
+
+func main() {
+	for n := range Fibonacci() {
+		if n > 1000 {
+			println(n)
+			break
+		}
+	}
 }
 ```
 
