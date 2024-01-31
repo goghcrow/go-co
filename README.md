@@ -9,9 +9,14 @@ Inspired by [wind-js](https://github.com/JeffreyZhao/wind).
 
 ## Quick Start
 
-Create source files ending with **_co.go**,  **_co_test.go**, and **build tag** required.
+Create source files ending with `_co.go` / `_co_test.go`.
 
-Run `go generate -tags co ./...` (or IDE whatever)
+Build tag `//go:build co` required.
+
+Then `go generate -tags co ./...` (or run by IDE whatever).
+
+And it is a good idea to switch custom build tag to `co` when working in goland or vscode,
+so IDE will be happy to index and check your code.
 
 ```golang
 //go:build co
@@ -48,6 +53,7 @@ func main() {
 
 - [Simple](example/example_co.go)
 - [Tree](example/tree/tree_co.go)
+- [Linq](example/linq/linq_co.go)
 - [Lexer](example/lexer/lexer_co.go)
 - [Sched](example/sched/sched_co.go)
 
