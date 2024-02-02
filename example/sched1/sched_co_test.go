@@ -18,22 +18,24 @@ func timeAfter(d time.Duration, cb func()) {
 }
 
 func Sleep(d time.Duration) Async {
-	return AsyncFun(func(cont func(v any, err error)) {
+	return func(cont Continuation) {
 		timeAfter(d, func() {
 			cont(nil, nil)
 		})
-	})
+	}
 }
 
 func SampleAsyncTask(v any) Async {
-	return AsyncFun(func(cont func(v any, err error)) {
+	return func(cont Continuation) {
 		timeAfter(time.Second*1, func() {
 			cont(v, nil)
 		})
-	})
+	}
 }
 
 func TestCo(t *testing.T) {
+	defer DeferMain()
+
 	now := func() string { return time.Now().Format("2006-01-02 15:04:05") }
 
 	Co(func(s *Sched) (_ Iter[Async]) {
@@ -52,6 +54,4 @@ func TestCo(t *testing.T) {
 		t.Log("end")
 		return
 	})
-
-	wg.Wait()
 }

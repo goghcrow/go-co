@@ -55,7 +55,8 @@ func main() {
 - [Tree](example/tree/tree_co.go)
 - [Linq](example/linq/linq_co.go)
 - [Lexer](example/lexer/lexer_co.go)
-- [Sched](example/sched/sched_co.go)
+- [Sched1](example/sched1/sched_co.go)
+- [Sched2](example/sched2/sched_co.go)
 
 
 ## API
