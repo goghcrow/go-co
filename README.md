@@ -1,8 +1,8 @@
-# What is go-co
+# 𝐖𝐡𝐚𝐭 𝐢𝐬 𝕘𝕠-𝕔𝕠 
 
-> **The Old New Thing**
+> **𝙏𝙝𝙚 𝙊𝙡𝙙 𝙉𝙚𝙬 𝙏𝙝𝙞𝙣𝙜**
 
-go-co(routine) is a **Source to Source Compiler** which rewrites trival yield statements to monadic style code.
+golang co-routine is a source to source compiler which rewrites trival yield statements to monadic style code.
 
 Inspired by [wind-js](https://github.com/JeffreyZhao/wind).
 
@@ -54,6 +54,7 @@ func main() {
 - [Simple](example/example_co.go)
 - [Tree](example/tree/tree_co.go)
 - [Linq](example/linq/linq_co.go)
+- [MicroThread](example/microthread/soldier_co.go)
 - [Lexer](example/lexer/lexer_co.go)
 - [Sched1](example/sched1/sched_co.go)
 - [Sched2](example/sched2/sched_co.go)

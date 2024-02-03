@@ -1,17 +1,12 @@
 package co
 
-// syntactic sugar interface declaration
-
-// please code depending on the type parameter instead of
-// the concrete and underlying type, e.g. <-chan
-
+// Iter is a 𝗦𝘆𝗻𝘁𝗮𝗰𝘁𝗶𝗰 𝗦𝘂𝗴𝗮𝗿
+// please coding depending on the type parameter [V]
+// instead of the underlying type <-chan
 type Iter[V any] <-chan V
 
-func (*Iter[V]) MoveNext() (_ bool) { return }
-func (*Iter[V]) Current() (_ V)     { return }
-
-// func (*Iter[V]) Send(V) (yield V, ok bool) { return }
-// func (*Iter[V]) Result() (_ V)             { return }
+func (Iter[V]) MoveNext() (_ bool) { return }
+func (Iter[V]) Current() (_ V)     { return }
 
 func Yield[V any](V)           {}
 func YieldFrom[V any](Iter[V]) {}

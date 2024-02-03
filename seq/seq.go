@@ -1,6 +1,8 @@
 package seq
 
-// Monadic Yield Implementation
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Monadic 🆈🅸🅴🅻🅳 Implementation
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 type contType int
 
@@ -34,14 +36,15 @@ type (
 		Result() V
 		Send(V) (yield V, ok bool)
 	}
-	// Iterable[V any] interface{ GetIter() Iterator[V] }
 )
 
-func mkNextRecv[V any](
-	f lazyRecv[V],
-	c *co[V],
-	k cont[V],
-) next[V] {
+// type Iterable[V any] interface { GetIterator() Iterator[V] }
+// type IterableFn[V any] func() Iterator[V]
+// func (f IterableFn[V]) GetIterator() Iterator[V] { return f() }
+
+func zero[V any]() (z V) { return }
+
+func mkNextRecv[V any](f lazyRecv[V], c *co[V], k cont[V]) next[V] {
 	return func(recv V) *step[V] {
 		// c.step = nil
 		f(recv)(c, k) // compute next, set the step if bind called,
@@ -61,10 +64,7 @@ func Start[V any](seq Seq[V]) Iterator[V] {
 	it = newGenerator[V](mkNext(
 		func() Seq[V] { return seq },
 		&co[V]{},
-		func(t contType, v V) {
-			// it.resultOk = true
-			it.result = v
-		},
+		func(t contType, v V) { it.result = v },
 	))
 	return it
 }
@@ -154,23 +154,23 @@ func Combine[V any](s1, s2 Seq[V]) Seq[V] {
 	}
 }
 
-func contSeq[V any](kt contType) Seq[V] {
+func seqOfK[V any](kt contType) Seq[V] {
 	return func(c *co[V], k cont[V]) {
 		k(kt, zero[V]())
 	}
 }
 
-func Normal[V any]() Seq[V]   { return contSeq[V](kNormal) }
-func Break[V any]() Seq[V]    { return contSeq[V](kBreak) }
-func Continue[V any]() Seq[V] { return contSeq[V](kContinue) }
-func Return[V any]() Seq[V]   { return contSeq[V](kReturn) }
+func Normal[V any]() Seq[V]   { return seqOfK[V](kNormal) }
+func Break[V any]() Seq[V]    { return seqOfK[V](kBreak) }
+func Continue[V any]() Seq[V] { return seqOfK[V](kContinue) }
+func Return[V any]() Seq[V]   { return seqOfK[V](kReturn) }
 func ReturnValue[V any](v V) Seq[V] { // supporting generator with return value
 	return func(c *co[V], k cont[V]) {
 		k(kReturn, v)
 	}
 }
 
-// ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Iterator ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 🅶🅴🅽🅴🆁🅰🆃🅾🆁 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 // asyncIter
 type generator[V any] struct {
@@ -229,7 +229,3 @@ func (d *generator[V]) moveNext(sent V) bool {
 		return true
 	}
 }
-
-// ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ etc ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-
-func zero[V any]() (z V) { return }

@@ -5,6 +5,3 @@ legacy
 
 rewriter/test/out
 rewriter/test/out_tmp
-
-rewriter/rewrite_dbg_test.go
-rewriter/test/src/dbg_test.go
