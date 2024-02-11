@@ -1,6 +1,6 @@
 //go:build co
 
-//go:generate go install github.com/goghcrow/go-co/cmd/cogen
+//go:generate go install github.com/goghcrow/go-co/cmd/cogen@main
 //go:generate cogen
 
 package linq
