@@ -31,7 +31,7 @@ func (s *Soldier) Init(shed *Sched) {
 //				Yield(s.AnimateReload)
 //			} else {
 //				s.MoveTowardsNextWayPoint()
-//				Yield(Sleep(time.Second))
+//				Yield(WaitFor(time.Second))
 //			}
 //		}
 //		return
@@ -61,7 +61,7 @@ func (s *Soldier) Patrol() (_ ʂɘʠ.Iterator[State]) {
 					} else {
 
 						s.MoveTowardsNextWayPoint()
-						return ʂɘʠ.Bind[State](Sleep(time.Second),
+						return ʂɘʠ.Bind[State](WaitFor(time.Second),
 							ʂɘʠ.Normal[State],
 						)
 					}
@@ -77,7 +77,7 @@ func (s *Soldier) Patrol() (_ ʂɘʠ.Iterator[State]) {
 //		for s.TargetAlive() && s.CanSeeTarget() {
 //			s.AimAtTarget()
 //			s.Fire()
-//			Yield(Sleep(time.Second * 1))
+//			Yield(WaitFor(time.Second))
 //		}
 //		return
 //	}
@@ -90,7 +90,7 @@ func (s *Soldier) Attack() (_ ʂɘʠ.Iterator[State]) {
 
 				s.AimAtTarget()
 				s.Fire()
-				return ʂɘʠ.Bind[State](Sleep(time.Second*1),
+				return ʂɘʠ.Bind[State](WaitFor(time.Second),
 					ʂɘʠ.Normal[State],
 				)
 			})),

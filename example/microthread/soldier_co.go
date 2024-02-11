@@ -34,7 +34,7 @@ func (s *Soldier) Patrol() (_ Iter[State]) {
 			Yield(s.AnimateReload)
 		} else {
 			s.MoveTowardsNextWayPoint()
-			Yield(Sleep(time.Second))
+			Yield(WaitFor(time.Second))
 		}
 	}
 	return
@@ -44,7 +44,7 @@ func (s *Soldier) Attack() (_ Iter[State]) {
 	for s.TargetAlive() && s.CanSeeTarget() {
 		s.AimAtTarget()
 		s.Fire()
-		Yield(Sleep(time.Second))
+		Yield(WaitFor(time.Second))
 	}
 	return
 }
