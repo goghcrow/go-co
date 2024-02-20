@@ -309,7 +309,7 @@ func instanceof[T any](x any) (ok bool) {
 	return
 }
 
-func mkDir(dir string) string {
+func mustMkDir(dir string) string {
 	dir, err := filepath.Abs(dir)
 	panicIf(err)
 	err = os.MkdirAll(dir, os.ModePerm)

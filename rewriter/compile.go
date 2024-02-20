@@ -38,9 +38,9 @@ func Compile(
 	srcDir, err := filepath.Abs(srcDir)
 	panicIf(err)
 
-	dstDir = mkDir(dstDir)
+	dstDir = mustMkDir(dstDir)
 
-	tmpOutputDir := mkDir(dstDir + "_tmp")
+	tmpOutputDir := mustMkDir(dstDir + "_tmp")
 	// tmpOutputDir, err = os.MkdirTemp("", "co_")
 	// panicIf(err)
 	if !runningWithGoTest {
@@ -74,7 +74,7 @@ func Compile(
 func GoGen(dir string) {
 	resetLog()
 
-	tmpOutputDir := mkDir(dir + "_tmp")
+	tmpOutputDir := mustMkDir(dir + "_tmp")
 	if !runningWithGoTest {
 		//goland:noinspection GoUnhandledErrorResult
 		defer os.RemoveAll(tmpOutputDir)
