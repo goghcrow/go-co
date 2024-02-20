@@ -8,12 +8,14 @@ import (
 	"log"
 
 	"github.com/goghcrow/go-ast-matcher"
-	"github.com/goghcrow/go-ast-matcher/imports"
+	"github.com/goghcrow/go-imports"
+	"github.com/goghcrow/go-loader"
 	"golang.org/x/tools/go/ast/astutil"
+	"golang.org/x/tools/go/types/typeutil"
 )
 
 type rewriter struct {
-	*matcher.Matcher
+	m astmatcher.ASTMatcher
 
 	// global context
 	iterType      types.Object
@@ -28,24 +30,36 @@ type rewriter struct {
 	comments        []*ast.CommentGroup
 }
 
-func mkRewriter(m *matcher.Matcher) *rewriter {
+func mkRewriter(m astmatcher.ASTMatcher) *rewriter {
 	return &rewriter{
-		Matcher:       m,
-		iterType:      m.MustLookup(qualifiedIter),
-		yieldFunc:     m.MustLookup(qualifiedYield),
-		yieldFromFunc: m.MustLookup(qualifiedYieldFrom),
+		m:             m,
+		iterType:      m.Loader.MustLookup(qualifiedIter),
+		yieldFunc:     m.Loader.MustLookup(qualifiedYield),
+		yieldFromFunc: m.Loader.MustLookup(qualifiedYieldFrom),
 	}
 }
 
 // Yield is stmt, not expr
-func (r *rewriter) isYieldCall(n ast.Node) (*ast.CallExpr, bool) {
+func (r *rewriter) isYieldCall(pkg loader.Pkg, n ast.Node) (*ast.CallExpr, bool) {
 	// e.g. for Yield(1); not here; Yield(2) {  Yield(3) }
-	return isCallStmtOf(r.Info, n, r.yieldFunc)
+	return r.isCallStmtOf(pkg, n, r.yieldFunc)
 }
 
 // YieldFrom is stmt, not expr
-func (r *rewriter) isYieldFromCall(n ast.Node) (*ast.CallExpr, bool) {
-	return isCallStmtOf(r.Info, n, r.yieldFromFunc)
+func (r *rewriter) isYieldFromCall(pkg loader.Pkg, n ast.Node) (*ast.CallExpr, bool) {
+	return r.isCallStmtOf(pkg, n, r.yieldFromFunc)
+}
+
+func (r *rewriter) isCallStmtOf(pkg loader.Pkg, n ast.Node, callee types.Object) (*ast.CallExpr, bool) {
+	expr, ok := n.(*ast.ExprStmt)
+	if !ok {
+		return nil, false
+	}
+	call, ok := expr.X.(*ast.CallExpr)
+	if !ok {
+		return nil, false
+	}
+	return call, pkg.Callee(call) == callee
 }
 
 func (r *rewriter) isYieldFuncDecl(f *ast.FuncDecl) bool {
@@ -56,10 +70,10 @@ func (r *rewriter) isYieldFuncLit(f *ast.FuncLit) bool {
 	return r.yieldFuncLits[f]
 }
 
-func (r *rewriter) yieldFuncRetParamTy(f *ast.FuncType) ast.Expr {
+func (r *rewriter) yieldFuncRetParamTy(pkg loader.Pkg, f *ast.FuncType) ast.Expr {
 	retTy := f.Results.List[0].Type
 	idx, is := retTy.(*ast.IndexExpr)
-	r.assert(is, f, "invalid yield func type")
+	r.assert(pkg, is, f, "invalid yield func type")
 	return idx.Index
 }
 
@@ -67,7 +81,8 @@ func (r *rewriter) isIterator(ty types.Type) bool {
 	return identicalWithoutTypeParam(r.iterType.Type(), ty)
 }
 
-func (r *rewriter) containsYield(n *ast.BlockStmt) bool {
+func (r *rewriter) containsYield(pkg loader.Pkg, n *ast.BlockStmt) bool {
+
 	return func() (contains bool) {
 		var abort = new(int)
 		defer func() {
@@ -80,7 +95,7 @@ func (r *rewriter) containsYield(n *ast.BlockStmt) bool {
 			case *ast.FuncDecl, *ast.FuncLit:
 				return false
 			case *ast.CallExpr:
-				callee := r.ObjectOfCall(n)
+				callee := pkg.Callee(n)
 				if callee == r.yieldFunc || callee == r.yieldFromFunc {
 					contains = true
 					panic(abort)
@@ -92,15 +107,15 @@ func (r *rewriter) containsYield(n *ast.BlockStmt) bool {
 	}()
 }
 
-func (r *rewriter) assert(ok bool, pos any, format string, a ...any) {
+func (r *rewriter) assert(pkg loader.Pkg, ok bool, pos any, format string, a ...any) {
 	if !ok {
 		loc := "unknown"
 		if !isNil(pos) {
 			switch pos := pos.(type) {
 			case ast.Node:
-				loc = r.ShowPos(pos)
+				loc = pkg.ShowNode(pos)
 			case token.Pos:
-				loc = r.FSet.Position(pos).String()
+				loc = pkg.Fset.Position(pos).String()
 			case string:
 				loc = pos
 			}
@@ -112,66 +127,72 @@ func (r *rewriter) assert(ok bool, pos any, format string, a ...any) {
 // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Rewrite ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
 
 func (r *rewriter) rewriteAllFiles(printer FilePrinter) {
-	coPkg := r.All[pkgCoPath]
+	coPkg := r.m.Loader.LookupPackage(pkgCoPath)
 	if coPkg == nil {
 		log.Printf("skip rewrite: no import %s\n", pkgCoPath)
 		return
 	}
 
-	r.VisitAllFiles(func(m *matcher.Matcher, file *ast.File) {
-		if !imports.Uses(m, file, coPkg.Types) {
-			log.Printf("skip file: %s\n", r.Filename)
+	r.m.Loader.VisitAllFiles(func(f *loader.File) {
+		if !imports.Uses(f, coPkg.Types) {
+			log.Printf("skip file: %s\n", f.Filename)
 			return
 		}
-		r.rewriteFile(file, printer)
+		r.rewriteFile(f, printer)
 	})
 }
 
-func (r *rewriter) rewriteFile(file *ast.File, printer FilePrinter) {
-	parseOrImport := func(f *ast.File) (coName, seqName string) {
+func (r *rewriter) rewriteFile(f *loader.File, printer FilePrinter) {
+	parseOrImport := func(fset *token.FileSet, f *ast.File) (coName, seqName string) {
 		coName = imports.ImportName(f, pkgCoPath, pkgCoName)
 		assert(coName != "") // coPkg != nil
 		seqName = imports.ImportName(f, pkgSeqPath, pkgSeqName)
 		if seqName == "" {
 			seqName = importSeqName
-			astutil.AddNamedImport(r.FSet, f, importSeqName, pkgSeqPath)
+			astutil.AddNamedImport(fset, f, importSeqName, pkgSeqPath)
 		}
 		return
 	}
 
+	pkg := f.Package()
+
 	// 1. init context
-	r.coImportedName, r.seqImportedName = parseOrImport(file) // parse import name
+	r.coImportedName, r.seqImportedName = parseOrImport(f.Pkg.Fset, f.File) // parse import name
 	r.comments = nil
 
 	r.yieldFuncDecls = map[*ast.FuncDecl]bool{}
 	r.yieldFuncLits = map[*ast.FuncLit]bool{}
-	r.collectYieldFunc(file) // collect func with yield/yieldFrom call
+	r.collectYieldFunc(pkg, f) // collect func with yield/yieldFrom call
 
 	// 2. edit file
-	log.Printf("visit file: %s\n", r.Filename)
-	do := func(f astutil.ApplyFunc) { astutil.Apply(file, nil, f) }
+	log.Printf("visit file: %s\n", f.Filename)
+	do := func(fn func(*astutil.Cursor, loader.Pkg) bool) {
+		astutil.Apply(f.File, nil, func(c *astutil.Cursor) bool {
+			return fn(c, pkg)
+		})
+	}
 
 	// file level instance for file scope cache
 	// notice: order matters
-	do(r.attachComment)        // attach the original source to comments
-	do(mkYieldFromRewriter(r)) // rewrite yieldFrom() to range yield() (range co.Iter)
-	do(r.rewriteForRanges)     // rewrite range co.Iter to for loop co.Iter
-	do(mkYieldRewriter(r))     // rewrite yield func
-	do(r.rewriteIter)          // rewrite all co.Iter to seq.Iterator
+	do(r.attachComment)             // attach the original source to comments
+	do(mkYieldFromRewriter(r, pkg)) // rewrite yieldFrom() to range yield() (range co.Iter)
+	do(r.rewriteForRanges)          // rewrite range co.Iter to for loop co.Iter
+	do(mkYieldRewriter(r, pkg))     // rewrite yield func
+	do(r.rewriteIter)               // rewrite all co.Iter to seq.Iterator
 
 	// 3. write file
-	log.Printf("write file: %s\n", r.Filename)
+	log.Printf("write file: %s\n", f.Filename)
 	// clear free-floating comments, preventing confusing position of comments
 	// https://github.com/golang/go/issues/20744
-	r.File.Comments = r.comments
-	printer(r.Filename, file)
+	f.File.Comments = r.comments
+	printer(f.Filename, f)
 }
 
 // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Collect YieldFunc ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
 
 // collect funs which containing yield / yieldFrom called directly by reference,
 // make sure funcDecl | funcLit modified in place afterward
-func (r *rewriter) collectYieldFunc(file *ast.File) {
+func (r *rewriter) collectYieldFunc(pkg loader.Pkg, f *loader.File) {
 	var (
 		yieldFunStack = mkStack[ast.Node /*FuncDecl|FuncLit*/](nil)
 		enter         = yieldFunStack.push
@@ -183,19 +204,20 @@ func (r *rewriter) collectYieldFunc(file *ast.File) {
 		msg := "invalid yield func signature, expect one co.Iter[T] return"
 
 		sig, ok := funTy.(*types.Signature)
-		r.assert(ok, pos, msg)
+		r.assert(pkg, ok, pos, msg)
 		rs := sig.Results()
 
 		singleRet := rs != nil && rs.Len() == 1
-		r.assert(singleRet, pos, msg)
+		r.assert(pkg, singleRet, pos, msg)
 
 		retTy := rs.At(0).Type()
 		retIter := r.isIterator(retTy)
-		r.assert(retIter, pos, msg)
+		r.assert(pkg, retIter, pos, msg)
 	}
 
+	info := f.Pkg.TypesInfo
 	cache := map[ast.Node]bool{}
-	astutil.Apply(file, func(c *astutil.Cursor) bool {
+	astutil.Apply(f.File, func(c *astutil.Cursor) bool {
 		switch f := c.Node().(type) {
 		case *ast.FuncDecl:
 			if cache[f] {
@@ -217,14 +239,14 @@ func (r *rewriter) collectYieldFunc(file *ast.File) {
 			exit()
 
 		case *ast.CallExpr:
-			callee := r.ObjectOfCall(n)
+			callee := typeutil.Callee(info, n)
 			if callee == r.yieldFunc || callee == r.yieldFromFunc {
 				switch f := outer().(type) {
 				case *ast.FuncDecl:
-					checkSignature(r.TypeOf(f.Name), n.Pos())
+					checkSignature(info.TypeOf(f.Name), n.Pos())
 					r.yieldFuncDecls[f] = true
 				case *ast.FuncLit:
-					checkSignature(r.TypeOf(f), n.Pos())
+					checkSignature(info.TypeOf(f), n.Pos())
 					r.yieldFuncLits[f] = true
 				}
 			}
@@ -235,7 +257,7 @@ func (r *rewriter) collectYieldFunc(file *ast.File) {
 
 // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Attach comment ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
 
-func (r *rewriter) attachComment(c *astutil.Cursor) bool {
+func (r *rewriter) attachComment(c *astutil.Cursor, pkg loader.Pkg) bool {
 	if runningWithGoTest {
 		return true
 	}
@@ -243,7 +265,7 @@ func (r *rewriter) attachComment(c *astutil.Cursor) bool {
 	case *ast.FuncDecl:
 		if r.isYieldFuncDecl(f) {
 			// attach comment to func decl
-			src := r.ShowNode(f)
+			src := pkg.ShowNode(f)
 			X.AppendComment(&f.Doc, X.Comment(f.Pos()-1, src))
 			c.Replace(f)
 		}
@@ -251,7 +273,7 @@ func (r *rewriter) attachComment(c *astutil.Cursor) bool {
 	case *ast.FuncLit:
 		if r.isYieldFuncLit(f) {
 			// attach comment to free-float
-			src := r.ShowNode(f)
+			src := pkg.ShowNode(f)
 			r.comments = append(r.comments,
 				X.Comments(X.Comment(f.Pos()-1, src)))
 			c.Replace(f)
@@ -263,11 +285,11 @@ func (r *rewriter) attachComment(c *astutil.Cursor) bool {
 
 // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Rewrite Range Generator ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
 
-func (r *rewriter) rewriteForRanges(c *astutil.Cursor) bool {
+func (r *rewriter) rewriteForRanges(c *astutil.Cursor, pkg loader.Pkg) bool {
 	switch n := c.Node().(type) {
 	case *ast.RangeStmt:
-		if r.isIterator(r.TypeOf(n.X)) {
-			c.Replace(r.rewriteForRange(n))
+		if r.isIterator(pkg.TypeOf(n.X)) {
+			c.Replace(r.rewriteForRange(pkg, n))
 		}
 		return true
 	}
@@ -284,12 +306,12 @@ func (r *rewriter) rewriteForRanges(c *astutil.Cursor) bool {
 //		x [:]= it.Current()
 //		$body
 //	}
-func (r *rewriter) rewriteForRange(fr *ast.RangeStmt) *ast.ForStmt {
+func (r *rewriter) rewriteForRange(pkg loader.Pkg, fr *ast.RangeStmt) *ast.ForStmt {
 	isValid := fr.Key != nil && fr.Value == nil
-	r.assert(isValid, fr, "invalid for range")
+	r.assert(pkg, isValid, fr, "invalid for range")
 
 	// iter := X.Ident(cstIterVar)
-	iter := r.NewIdent(cstIterVar, r.TypeOf(fr.X))
+	iter := pkg.NewIdent(cstIterVar, pkg.TypeOf(fr.X))
 	current := X.Select(iter, cstCurrent)
 	next := X.Select(iter, cstMoveNext)
 
@@ -305,10 +327,10 @@ func (r *rewriter) rewriteForRange(fr *ast.RangeStmt) *ast.ForStmt {
 // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ Rewrite co.Iter ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
 
 // co.Iter[T] => seq.Iterator[T]
-func (r *rewriter) rewriteIter(c *astutil.Cursor) bool {
+func (r *rewriter) rewriteIter(c *astutil.Cursor, pkg loader.Pkg) bool {
 	switch n := c.Node().(type) {
 	case *ast.IndexExpr:
-		if r.isIterator(r.TypeOf(n.X)) {
+		if r.isIterator(pkg.TypeOf(n.X)) {
 			c.Replace(X.Index(
 				X.PkgSelect(r.seqImportedName, cstIterator),
 				n.Index,

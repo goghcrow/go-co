@@ -69,15 +69,14 @@ package main
 
 import (
     "github.com/goghcrow/go-co/rewriter"
-    "github.com/goghcrow/go-ast-matcher"
+    "github.com/goghcrow/go-loader"
 )
 
 func main() {
     rewriter.Compile(
         "./src",
         "./out",
-        matcher.PatternAll,
-        matcher.WithLoadTest(),
+        loader.WithLoadTest(),
     )
 }
 ```

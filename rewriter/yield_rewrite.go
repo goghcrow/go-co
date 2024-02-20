@@ -6,12 +6,15 @@ import (
 	"go/types"
 	"log"
 
-	matcher "github.com/goghcrow/go-ast-matcher"
+	"github.com/goghcrow/go-loader"
+	"github.com/goghcrow/go-matcher"
+	"github.com/goghcrow/go-matcher/combinator"
 	"golang.org/x/tools/go/ast/astutil"
 )
 
 type yieldRewriter struct {
 	rewriter *rewriter
+	pkg      loader.Pkg
 
 	funcTyp  *ast.FuncType
 	funcBody *ast.BlockStmt
@@ -23,14 +26,15 @@ type yieldRewriter struct {
 	symCnt int // for unique symbol
 }
 
-func mkYieldRewriter(r *rewriter) func(c *astutil.Cursor) bool {
+func mkYieldRewriter(r *rewriter, pkg loader.Pkg) func(*astutil.Cursor, loader.Pkg) bool {
 	return (&yieldRewriter{
 		rewriter:        r,
+		pkg:             pkg,
 		rewriteRetCache: map[ast.Node]bool{},
 	}).rewrite
 }
 
-func (r *yieldRewriter) rewrite(c *astutil.Cursor) bool {
+func (r *yieldRewriter) rewrite(c *astutil.Cursor, pkg loader.Pkg) bool {
 	switch f := c.Node().(type) {
 	case *ast.FuncDecl:
 		if r.rewriter.isYieldFuncDecl(f) {
@@ -56,7 +60,7 @@ func (r *yieldRewriter) rewriteYieldFunc(
 	r.funcBody = body
 	r.yieldAst = mkYieldAst(
 		r.rewriter.seqImportedName,
-		r.rewriter.yieldFuncRetParamTy(funTy),
+		r.rewriter.yieldFuncRetParamTy(r.pkg, funTy),
 	)
 	// not support recursive, no need stack
 	defer func() {
@@ -202,7 +206,7 @@ func (r *yieldRewriter) rewriteStmt(
 
 	case *ast.ExprStmt:
 		// rewrite yield call
-		if call, ok := r.rewriter.isYieldCall(stmt); ok {
+		if call, ok := r.rewriter.isYieldCall(r.pkg, stmt); ok {
 			r.checkYieldCall(call) // typeCheck
 
 			// ↓↓ non-trival branch ↓↓
@@ -323,12 +327,12 @@ func (r *yieldRewriter) generateLastNormalIfNecessary(children *block) {
 	}
 }
 func (r *yieldRewriter) checkYieldCall(call *ast.CallExpr) {
-	v := r.rewriter.TypeOf(call.Args[0])
-	t := r.rewriter.TypeOf(r.yieldAst.funRetParamTy)
+	v := r.pkg.TypeOf(call.Args[0])
+	t := r.pkg.TypeOf(r.yieldAst.funRetParamTy)
 	// generated codes have attached the type
 	assert(v != nil && t != nil)
 
-	arg := r.rewriter.ShowNode(call.Args[0])
+	arg := r.pkg.ShowNode(call.Args[0])
 	r.assert(types.AssignableTo(v, t), call.Lparen,
 		"yield(%s):"+
 			" type mismatch, typeof(%s) is %s, "+
@@ -590,7 +594,6 @@ func (r *yieldRewriter) rewriteReturnAndForSwitchInitStmtInYieldFun(body *ast.Bl
 		exit          = yieldFunStack.pop
 		inYieldFunc   = yieldFunStack.top
 
-		typeof   = r.rewriter.TypeOf
 		isRetNil = func(ret *ast.ReturnStmt) bool {
 			if ret.Results == nil {
 				return true
@@ -599,7 +602,7 @@ func (r *yieldRewriter) rewriteReturnAndForSwitchInitStmtInYieldFun(body *ast.Bl
 				return false
 			}
 			tyNil := types.Universe.Lookup("nil")
-			return types.Identical(tyNil.Type(), typeof(ret.Results[0]))
+			return types.Identical(tyNil.Type(), r.pkg.TypeOf(ret.Results[0]))
 		}
 	)
 
@@ -631,7 +634,7 @@ func (r *yieldRewriter) rewriteReturnAndForSwitchInitStmtInYieldFun(body *ast.Bl
 			// notice: only rewrite `return` or `return nil` stmt
 			if inYieldFunc() {
 				if !isRetNil(n) {
-					log.Println("ignore return: " + r.rewriter.ShowNodeWithPos(n))
+					log.Println("ignore return: " + r.pkg.ShowNode(n))
 					assert(len(n.Results) == 1)
 					c.InsertBefore(X.IgnoreExpr(n.Results[0]))
 				}
@@ -794,7 +797,7 @@ func (r *yieldRewriter) mustNoYield(stmt ast.Stmt) bool {
 	if isNil(stmt) {
 		return true
 	}
-	return !r.rewriter.containsYield(X.Block(stmt))
+	return !r.rewriter.containsYield(r.pkg, X.Block(stmt))
 
 	// // isLast=false and kind=kindYield
 	// // don't affect the result
@@ -804,10 +807,10 @@ func (r *yieldRewriter) mustNoYield(stmt ast.Stmt) bool {
 }
 
 func (r *yieldRewriter) isTerminating(s ast.Stmt) bool {
-	m := r.rewriter.Matcher
+	m := r.rewriter.m.Matcher
 	panicCallSites := make(map[*ast.CallExpr]bool)
-	m.MatchNode(matcher.BuiltinCallee(m, "panic"), s,
-		func(m *matcher.Matcher, c *astutil.Cursor, stack []ast.Node, binds matcher.Binds) {
+	m.Match(r.pkg.Package, combinator.BuiltinCallee(m, "panic"), s,
+		func(c *matcher.Cursor, ctx *matcher.MatchCtx) {
 			panicCallSites[c.Node().(*ast.CallExpr)] = true
 		},
 	)
@@ -821,5 +824,5 @@ func (r *yieldRewriter) assert(
 	format string,
 	a ...any,
 ) {
-	r.rewriter.assert(ok, pos, format, a...)
+	r.rewriter.assert(r.pkg, ok, pos, format, a...)
 }

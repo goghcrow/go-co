@@ -4,48 +4,49 @@ import (
 	"go/ast"
 	"log"
 
-	. "github.com/goghcrow/go-ast-matcher"
-	"github.com/goghcrow/go-ast-matcher/imports"
-	"golang.org/x/tools/go/ast/astutil"
+	"github.com/goghcrow/go-ast-matcher"
+	"github.com/goghcrow/go-imports"
+	"github.com/goghcrow/go-loader"
+	"github.com/goghcrow/go-matcher"
+	. "github.com/goghcrow/go-matcher/combinator"
 )
 
 type optimizer struct {
-	*Matcher
+	m astmatcher.ASTMatcher
 }
 
-func mkOptimizer(m *Matcher) *optimizer {
+func mkOptimizer(m astmatcher.ASTMatcher) *optimizer {
 	return &optimizer{m}
 }
 
 func (o *optimizer) optimizeAllFiles(printer FilePrinter) {
-	m := o.Matcher
-	seqPkg := m.All[pkgSeqPath]
+	seqPkg := o.m.Loader.LookupPackage(pkgSeqPath)
 	if seqPkg == nil {
 		log.Printf("skip optimize: no import %s\n", pkgSeqPath)
 		return
 	}
 
-	m.VisitAllFiles(func(m *Matcher, file *ast.File) {
-		if !imports.Uses(m, file, seqPkg.Types) {
-			log.Printf("skip file: %s\n", m.Filename)
+	o.m.Loader.VisitAllFiles(func(f *loader.File) {
+		if !imports.Uses(f, seqPkg.Types) {
+			log.Printf("skip file: %s\n", f.Filename)
 			return
 		}
 
 		// 1. optimize file
-		log.Printf("visit file: %s\n", m.Filename)
-		o.optimizeImports()
+		log.Printf("visit file: %s\n", f.Filename)
+		o.optimizeImports(f)
 		o.optimizeDelayCall()
 		// o.optimizeBindCall()
 		o.etaReduction()
 
 		// 2. write file
-		log.Printf("write file: %s\n", m.Filename)
-		printer(m.Filename, file)
+		log.Printf("write file: %s\n", f.Filename)
+		printer(f.Filename, f)
 	})
 }
 
-func (o *optimizer) optimizeImports() {
-	imports.Clean(o.Matcher, o.File)
+func (o *optimizer) optimizeImports(f *loader.File) {
+	imports.Clean(o.m.Loader, f)
 }
 
 // NOTICE:
@@ -90,11 +91,14 @@ func (o *optimizer) optimizeImports() {
 //				}))
 //			}
 func (o *optimizer) optimizeDelayCall() {
-	m := o.Matcher
+	m := o.m.Matcher
+
 	var calleeOf func(...string) CallExprPattern
 	calleeOf = func(xs ...string) CallExprPattern {
 		assert(len(xs) > 0)
-		callee := FuncCallee(m, pkgSeqPath, xs[0])
+		qualified := pkgSeqPath + "." + xs[0]
+		funObj := o.m.Loader.MustLookup(qualified)
+		callee := FuncCallee(m, funObj, xs[0])
 		if len(xs) == 1 {
 			return callee
 		} else {
@@ -102,16 +106,21 @@ func (o *optimizer) optimizeDelayCall() {
 		}
 	}
 
-	constTrue := func(m *Matcher, n ast.Node, stack []ast.Node, binds Binds) bool { return true }
+	constTrue := func(n ast.Node, ctx *matcher.MatchCtx) bool { return true }
+
+	var (
+		bindFnObj  = o.m.Loader.MustLookup(pkgSeqPath + "." + cstBind)
+		dealyFnObj = o.m.Loader.MustLookup(pkgSeqPath + "." + cstDelay)
+	)
 
 	// Currently only the first parameter of Bind has side effects
 	noEffectBindCall := AndEx[CallExprPattern](m,
-		FuncCallee(m, pkgSeqPath, cstBind),
+		FuncCallee(m, bindFnObj, cstBind),
 		// seq.Bind[T](literal, ...)
 		&ast.CallExpr{
 			Args: []ast.Expr{
-				MkPattern[BasicLitPattern](m, constTrue), // literal
-				Wildcard[ExprPattern](m),                 // whatever
+				matcher.MkPattern[BasicLitPattern](m, constTrue), // literal
+				Wildcard[ExprPattern](m),                         // whatever
 			},
 		},
 	)
@@ -124,7 +133,7 @@ func (o *optimizer) optimizeDelayCall() {
 		cstReturn,
 	)
 	delayCallWithNoEffectDirectReturn := AndEx[CallExprPattern](m,
-		FuncCallee(m, pkgSeqPath, cstDelay),
+		FuncCallee(m, dealyFnObj, cstDelay),
 		&ast.CallExpr{
 			Args: []ast.Expr{
 				&ast.FuncLit{
@@ -144,10 +153,10 @@ func (o *optimizer) optimizeDelayCall() {
 		},
 	)
 
-	m.Match(
+	o.m.Match(
 		delayCallWithNoEffectDirectReturn,
-		func(m *Matcher, c *astutil.Cursor, stack []ast.Node, binds Binds) {
-			c.Replace(binds["return"])
+		func(c *astmatcher.Cursor, ctx astmatcher.Ctx) {
+			c.Replace(ctx.Binds["return"])
 		},
 	)
 }
@@ -155,12 +164,14 @@ func (o *optimizer) optimizeDelayCall() {
 // eat reduction overrides this particularity optimization
 // no longer required
 func (o *optimizer) optimizeBindCall() {
-	m := o.Matcher
+	m := o.m.Matcher
+
+	bindFnObj := o.m.Loader.MustLookup(pkgSeqPath + "." + cstBind)
 	// Bind[T](*, func() Seq[T] { return [Normal|Break|Continue|...]() })
 	// =>
 	// Bind[T](*, [Normal|Break|Continue|...]())
 	bindCallWithDirectReturn := AndEx[CallExprPattern](m,
-		FuncCallee(m, pkgSeqPath, cstBind),
+		FuncCallee(m, bindFnObj, cstBind),
 		&ast.CallExpr{
 			Args: []ast.Expr{
 				Wildcard[ExprPattern](m),
@@ -168,7 +179,7 @@ func (o *optimizer) optimizeBindCall() {
 					Body: X.Block(
 						X.Return(
 							&ast.CallExpr{
-								Fun:  MkVar[ExprPattern](m, "fun"),
+								Fun:  matcher.MkVar[ExprPattern](m, "fun"),
 								Args: []ast.Expr{},
 							},
 						),
@@ -177,11 +188,11 @@ func (o *optimizer) optimizeBindCall() {
 			},
 		},
 	)
-	m.Match(
+	o.m.Match(
 		bindCallWithDirectReturn,
-		func(m *Matcher, c *astutil.Cursor, stack []ast.Node, binds Binds) {
+		func(c *astmatcher.Cursor, ctx astmatcher.Ctx) {
 			bindCall := c.Node()
-			bindCall.(*ast.CallExpr).Args[1] = binds["fun"].(ast.Expr)
+			bindCall.(*ast.CallExpr).Args[1] = ctx.Binds["fun"].(ast.Expr)
 			c.Replace(bindCall)
 		},
 	)
@@ -189,23 +200,24 @@ func (o *optimizer) optimizeBindCall() {
 
 // fun(...args) { return return f(...args) }  ==>  f
 func (o *optimizer) etaReduction() {
-	m := o.Matcher
+	m := o.m.Matcher
+
 	pattern := &ast.FuncLit{
 		Type: &ast.FuncType{
-			Params: MkVar[FieldListPattern](m, "params"),
+			Params: matcher.MkVar[FieldListPattern](m, "params"),
 		},
 		Body: X.Block(
 			X.Return(
 				&ast.CallExpr{
-					Fun:  MkVar[ExprPattern](m, "fun"),
-					Args: MkVar[ExprsPattern](m, "args"),
+					Fun:  matcher.MkVar[ExprPattern](m, "fun"),
+					Args: matcher.MkVar[ExprsPattern](m, "args"),
 				},
 			),
 		),
 	}
 
 	// assume type-checked
-	matched := func(m *Matcher, paramsFields []*ast.Field, argsExprs []ast.Expr) bool {
+	matched := func(ctx astmatcher.Ctx, paramsFields []*ast.Field, argsExprs []ast.Expr) bool {
 		if paramsFields == nil && argsExprs == nil {
 			return true
 		}
@@ -234,7 +246,7 @@ func (o *optimizer) etaReduction() {
 			if arg.Name != param.Name {
 				return false
 			}
-			if m.ObjectOf(arg) != m.ObjectOf(param) {
+			if ctx.ObjectOf(arg) != ctx.ObjectOf(param) {
 				return false
 			}
 		}
@@ -242,13 +254,13 @@ func (o *optimizer) etaReduction() {
 		return true
 	}
 
-	m.Match(
+	o.m.Match(
 		pattern,
-		func(m *Matcher, c *astutil.Cursor, stack []ast.Node, binds Binds) {
-			params := binds["params"].(*ast.FieldList).List
-			args := binds["args"].(ExprsNode)
-			if matched(m, params, args) {
-				c.Replace(binds["fun"])
+		func(c *astmatcher.Cursor, ctx astmatcher.Ctx) {
+			params := ctx.Binds["params"].(*ast.FieldList).List
+			args := ctx.Binds["args"].(ExprsNode)
+			if matched(ctx, params, args) {
+				c.Replace(ctx.Binds["fun"])
 			}
 		},
 	)

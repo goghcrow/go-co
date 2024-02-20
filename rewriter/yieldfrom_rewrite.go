@@ -5,21 +5,23 @@ import (
 	"go/token"
 	"go/types"
 
+	"github.com/goghcrow/go-loader"
 	"golang.org/x/tools/go/ast/astutil"
 )
 
 type yieldFromRewriter struct {
 	rewriter *rewriter
+	pkg      loader.Pkg
 }
 
-func mkYieldFromRewriter(r *rewriter) func(c *astutil.Cursor) bool {
-	return (&yieldFromRewriter{rewriter: r}).rewrite
+func mkYieldFromRewriter(r *rewriter, pkg loader.Pkg) func(*astutil.Cursor, loader.Pkg) bool {
+	return (&yieldFromRewriter{rewriter: r, pkg: pkg}).rewrite
 }
 
-func (r *yieldFromRewriter) rewrite(c *astutil.Cursor) bool {
+func (r *yieldFromRewriter) rewrite(c *astutil.Cursor, pkg loader.Pkg) bool {
 	switch n := c.Node().(type) {
 	case *ast.ExprStmt:
-		if call, ok := r.rewriter.isYieldFromCall(n); ok {
+		if call, ok := r.rewriter.isYieldFromCall(r.pkg, n); ok {
 			c.Replace(r.rewriteYieldFrom(call))
 			return true
 		}
@@ -39,7 +41,7 @@ func (r *yieldFromRewriter) rewriteYieldFrom(call *ast.CallExpr) *ast.RangeStmt 
 	// so we need to update info.Uses[GeneratedYield] to `yieldFunc`
 	// `typeutil.Callee` calling in isYieldCall use info.Uses only, not info.Selections
 	// so we only update info.Uses here
-	r.rewriter.UpdateUses(yield, r.rewriter.yieldFunc)
+	r.pkg.UpdateUses(yield, r.rewriter.yieldFunc)
 
 	// wrap the Yield type parameter the same as YieldFrom
 	if idx, ok := call.Fun.(*ast.IndexExpr); ok {
@@ -54,7 +56,7 @@ func (r *yieldFromRewriter) rewriteYieldFrom(call *ast.CallExpr) *ast.RangeStmt 
 func (r *yieldFromRewriter) checkYieldCall(call *ast.CallExpr) types.Type {
 	r.assert(len(call.Args) == 1, call, "invalid args num")
 	iter := call.Args[0]
-	tyOfIt := r.rewriter.TypeOf(iter) // co.Iter[V]
+	tyOfIt := r.pkg.TypeOf(iter) // co.Iter[V]
 
 	msg := "invalid YieldFrom arg type"
 	r.assert(instanceof[*types.Named](tyOfIt), call, msg)
@@ -74,7 +76,7 @@ func (r *yieldFromRewriter) rangeIter(
 ) *ast.RangeStmt {
 	// key := X.Ident(cstYieldFromRangeVar)
 	// make ident with a type for checkYieldCall
-	key := r.rewriter.NewIdent(cstYieldFromRangeVar, iterT)
+	key := r.pkg.NewIdent(cstYieldFromRangeVar, iterT)
 
 	call := X.Call(yieldFun, key)
 	call.Lparen = pos.Lparen
@@ -82,7 +84,7 @@ func (r *yieldFromRewriter) rangeIter(
 
 	callYield := X.Stmt(call)
 
-	_, isYieldCall := r.rewriter.isYieldCall(callYield)
+	_, isYieldCall := r.rewriter.isYieldCall(r.pkg, callYield)
 	assert(isYieldCall)
 
 	return &ast.RangeStmt{
@@ -94,5 +96,5 @@ func (r *yieldFromRewriter) rangeIter(
 }
 
 func (r *yieldFromRewriter) assert(ok bool, pos ast.Node, format string, a ...any) {
-	r.rewriter.assert(ok, pos, format, a...)
+	r.rewriter.assert(r.pkg, ok, pos, format, a...)
 }

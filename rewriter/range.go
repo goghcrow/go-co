@@ -34,7 +34,7 @@ func (r *yieldRewriter) rewriteRanges(block *ast.BlockStmt) {
 				c.Replace(forStmt)
 			}
 
-			ty := r.rewriter.TypeOf(n.X)
+			ty := r.pkg.TypeOf(n.X)
 			r.assert(!isNil(ty), n.X, "type missing")
 			ty = ty.Underlying()
 

@@ -6,16 +6,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/goghcrow/go-ast-matcher"
+	"github.com/goghcrow/go-loader"
 )
 
 func TestRewrite(t *testing.T) {
 	in := "test/src"
 	out := "test/out"
 	tmp := out + "_tmp"
-	files := matcher.PatternAll
 
-	Compile(in, out, files, matcher.WithLoadTest())
+	Compile(in, out, loader.WithLoadTest())
 
 	xs, _ := os.ReadDir(in)
 	for _, x := range xs {

@@ -3,10 +3,16 @@ module github.com/goghcrow/go-co
 go 1.19
 
 require (
-	github.com/goghcrow/go-ast-matcher v0.0.13-0.20240130184623-e1946368edb4
-	golang.org/x/tools v0.17.0
+	github.com/goghcrow/go-ast-matcher v0.1.3
+	github.com/goghcrow/go-imports v0.0.2
+	github.com/goghcrow/go-loader v0.0.3
+	github.com/goghcrow/go-matcher v0.0.4
+	golang.org/x/tools v0.18.0
 )
 
-require golang.org/x/mod v0.14.0 // indirect
+require golang.org/x/mod v0.15.0 // indirect
 
+//replace github.com/goghcrow/go-matcher => ./../go-matcher
+//replace github.com/goghcrow/go-loader => ./../go-loader
 //replace github.com/goghcrow/go-ast-matcher => ./../go-ast-matcher
+//replace github.com/goghcrow/go-imports => ./../go-imports

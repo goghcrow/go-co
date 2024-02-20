@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
-
-	"golang.org/x/tools/go/types/typeutil"
 )
 
 // https://stackoverflow.com/questions/14249217/how-do-i-know-im-running-within-go-test
@@ -242,18 +240,6 @@ func isUnderline(expr ast.Expr) bool {
 func isDefineStmt(stmt ast.Stmt) bool {
 	assign, ok := stmt.(*ast.AssignStmt)
 	return ok && assign.Tok == token.DEFINE
-}
-
-func isCallStmtOf(info *types.Info, n ast.Node, callee types.Object) (*ast.CallExpr, bool) {
-	expr, ok := n.(*ast.ExprStmt)
-	if !ok {
-		return nil, false
-	}
-	call, ok := expr.X.(*ast.CallExpr)
-	if !ok {
-		return nil, false
-	}
-	return call, typeutil.Callee(info, call) == callee
 }
 
 func identicalWithoutTypeParam(x, y types.Type) bool {
